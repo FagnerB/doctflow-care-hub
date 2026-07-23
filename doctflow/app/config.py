@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     default_cancellation_policy_hours: int = 24
 
     whatsapp_provider: str = "console"
+    whatsapp_api_key: str = ""
+    whatsapp_api_url: str = ""
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_whatsapp_from: str = ""

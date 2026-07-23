@@ -6,7 +6,7 @@ from functools import wraps
 from typing import Callable, Coroutine, TypeVar
 
 from fastapi import Depends, Request
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +17,7 @@ from app.models.doctor import Doctor
 from app.models.user import User
 from app.services.auth_service import auth_service
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+bearer_scheme = HTTPBearer(auto_error=True, scheme_name="BearerAuth")
 
 RateKey = tuple[str, str]
 _rate_buckets: dict[RateKey, deque[datetime]] = defaultdict(deque)
@@ -29,7 +29,11 @@ async def get_db_session() -> AsyncSession:
     raise RuntimeError("Sessão de banco indisponível")
 
 
-async def get_current_user(session: AsyncSession = Depends(get_db_session), token: str = Depends(oauth2_scheme)) -> User:
+async def get_current_user(
+    session: AsyncSession = Depends(get_db_session),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> User:
+    token = credentials.credentials
     payload = auth_service.decode_token(token)
     user_id = payload.get("user_id") or payload.get("sub")
     if not user_id:

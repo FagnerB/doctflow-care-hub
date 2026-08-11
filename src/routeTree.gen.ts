@@ -11,10 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as AppointmentIdRouteImport } from './routes/appointment.$id'
 import { Route as DSlugRouteImport } from './routes/d.$slug'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
+import { Route as DashboardExceptionsRouteImport } from './routes/dashboard.exceptions'
 import { Route as DashboardPatientsRouteImport } from './routes/dashboard.patients'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 
@@ -28,14 +32,29 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppointmentIdRoute = AppointmentIdRouteImport.update({
+  id: '/appointment/$id',
+  path: '/appointment/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DSlugRoute = DSlugRouteImport.update({
@@ -46,6 +65,11 @@ const DSlugRoute = DSlugRouteImport.update({
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardExceptionsRoute = DashboardExceptionsRouteImport.update({
+  id: '/exceptions',
+  path: '/exceptions',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardPatientsRoute = DashboardPatientsRouteImport.update({
@@ -62,18 +86,26 @@ const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
+  '/appointment/$id': typeof AppointmentIdRoute
   '/d/$slug': typeof DSlugRoute
+  '/dashboard/exceptions': typeof DashboardExceptionsRoute
   '/dashboard/patients': typeof DashboardPatientsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
+  '/appointment/$id': typeof AppointmentIdRoute
   '/d/$slug': typeof DSlugRoute
+  '/dashboard/exceptions': typeof DashboardExceptionsRoute
   '/dashboard/patients': typeof DashboardPatientsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -82,9 +114,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
+  '/appointment/$id': typeof AppointmentIdRoute
   '/d/$slug': typeof DSlugRoute
+  '/dashboard/exceptions': typeof DashboardExceptionsRoute
   '/dashboard/patients': typeof DashboardPatientsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -94,18 +130,26 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/setup'
+    | '/appointment/$id'
     | '/d/$slug'
+    | '/dashboard/exceptions'
     | '/dashboard/patients'
     | '/dashboard/settings'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/setup'
+    | '/appointment/$id'
     | '/d/$slug'
+    | '/dashboard/exceptions'
     | '/dashboard/patients'
     | '/dashboard/settings'
     | '/dashboard'
@@ -113,9 +157,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/dashboard'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/setup'
+    | '/appointment/$id'
     | '/d/$slug'
+    | '/dashboard/exceptions'
     | '/dashboard/patients'
     | '/dashboard/settings'
     | '/dashboard/'
@@ -124,8 +172,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
+  AppointmentIdRoute: typeof AppointmentIdRoute
   DSlugRoute: typeof DSlugRoute
 }
 
@@ -145,6 +196,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -152,11 +210,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/setup': {
       id: '/setup'
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/appointment/$id': {
+      id: '/appointment/$id'
+      path: '/appointment/$id'
+      fullPath: '/appointment/$id'
+      preLoaderRoute: typeof AppointmentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/d/$slug': {
@@ -171,6 +243,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/dashboard/'
       preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/exceptions': {
+      id: '/dashboard/exceptions'
+      path: '/exceptions'
+      fullPath: '/dashboard/exceptions'
+      preLoaderRoute: typeof DashboardExceptionsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/patients': {
@@ -191,12 +270,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteChildren {
+  DashboardExceptionsRoute: typeof DashboardExceptionsRoute
   DashboardPatientsRoute: typeof DashboardPatientsRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardExceptionsRoute: DashboardExceptionsRoute,
   DashboardPatientsRoute: DashboardPatientsRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardIndexRoute: DashboardIndexRoute,
@@ -209,8 +290,11 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
+  AppointmentIdRoute: AppointmentIdRoute,
   DSlugRoute: DSlugRoute,
 }
 export const routeTree = rootRouteImport

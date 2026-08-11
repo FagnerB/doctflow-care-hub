@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.exceptions import NotFoundError
+from app.exceptions import NotFoundError, ValidationError
 from app.models.appointment import Appointment
 from app.models.common import AppointmentStatus, weekday_key
 from app.models.doctor import Doctor
@@ -64,7 +64,7 @@ def _parse_config(doctor: Doctor) -> DoctorConfig:
 
 
 def _day_windows(config: DoctorConfig, target_date: date) -> list[SlotWindow]:
-    timezone = ZoneInfo(settings.timezone)
+    local_tz = ZoneInfo(settings.timezone)
     day_name = weekday_key(target_date)
     windows: list[SlotWindow] = []
     for window in config.working_hours.get(day_name, []):
@@ -72,29 +72,31 @@ def _day_windows(config: DoctorConfig, target_date: date) -> list[SlotWindow]:
         end_hour, end_minute = map(int, window.end.split(":"))
         windows.append(
             SlotWindow(
-                start=datetime.combine(target_date, time(start_hour, start_minute), tzinfo=timezone),
-                end=datetime.combine(target_date, time(end_hour, end_minute), tzinfo=timezone),
+                start=datetime.combine(target_date, time(start_hour, start_minute), tzinfo=local_tz),
+                end=datetime.combine(target_date, time(end_hour, end_minute), tzinfo=local_tz),
             )
         )
     return windows
 
 
 def _exception_windows(exceptions: list[ScheduleException], target_date: date) -> list[SlotWindow]:
-    timezone = ZoneInfo(settings.timezone)
+    local_tz = ZoneInfo(settings.timezone)
     windows: list[SlotWindow] = []
     for exception in exceptions:
         if exception.start_time is None or exception.end_time is None:
+            # Bloqueio de dia inteiro: cobre até o início do dia seguinte para não
+            # deixar escapar um slot que termine às 23:59:59.
             windows.append(
                 SlotWindow(
-                    start=datetime.combine(target_date, time.min, tzinfo=timezone),
-                    end=datetime.combine(target_date, time.max.replace(microsecond=0), tzinfo=timezone),
+                    start=datetime.combine(target_date, time.min, tzinfo=local_tz),
+                    end=datetime.combine(target_date + timedelta(days=1), time.min, tzinfo=local_tz),
                 )
             )
             continue
         windows.append(
             SlotWindow(
-                start=datetime.combine(target_date, exception.start_time, tzinfo=timezone),
-                end=datetime.combine(target_date, exception.end_time, tzinfo=timezone),
+                start=datetime.combine(target_date, exception.start_time, tzinfo=local_tz),
+                end=datetime.combine(target_date, exception.end_time, tzinfo=local_tz),
             )
         )
     return windows
@@ -112,8 +114,10 @@ def generate_available_slots(
     now: datetime | None = None,
 ) -> list[AvailabilitySlot]:
     config = _parse_config(doctor)
-    timezone = ZoneInfo(settings.timezone)
-    current_time = now.astimezone(timezone) if now is not None else datetime.now(timezone)
+    # Não use o nome `timezone` aqui: ele sombrearia datetime.timezone e quebraria
+    # `timezone.utc` logo abaixo, ao normalizar datas naive vindas do banco.
+    local_tz = ZoneInfo(settings.timezone)
+    current_time = now.astimezone(local_tz) if now is not None else datetime.now(local_tz)
     booking_deadline = current_time.date() + timedelta(days=config.advance_booking_days)
 
     if target_date < current_time.date() or target_date > booking_deadline:
@@ -125,13 +129,15 @@ def generate_available_slots(
         return []
 
     exception_windows = _exception_windows(exceptions, target_date)
-    occupied_windows = [
-        SlotWindow(
-            start=(appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)).astimezone(timezone),
-            end=(appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)).astimezone(timezone) + timedelta(minutes=appointment.duration_minutes),
+    occupied_windows = []
+    for appointment in appointments:
+        scheduled_at = appointment.scheduled_at
+        if scheduled_at.tzinfo is None:
+            scheduled_at = scheduled_at.replace(tzinfo=timezone.utc)
+        start_local = scheduled_at.astimezone(local_tz)
+        occupied_windows.append(
+            SlotWindow(start=start_local, end=start_local + timedelta(minutes=appointment.duration_minutes))
         )
-        for appointment in appointments
-    ]
 
     slots: list[AvailabilitySlot] = []
     for working_window in windows:
@@ -156,10 +162,10 @@ def generate_available_slots(
 
 
 def desired_datetime_to_local(desired_datetime: datetime) -> datetime:
-    timezone = ZoneInfo(settings.timezone)
+    local_tz = ZoneInfo(settings.timezone)
     if desired_datetime.tzinfo is None:
-        return desired_datetime.replace(tzinfo=timezone)
-    return desired_datetime.astimezone(timezone)
+        return desired_datetime.replace(tzinfo=local_tz)
+    return desired_datetime.astimezone(local_tz)
 
 
 def desired_datetime_to_utc(desired_datetime: datetime) -> datetime:
@@ -167,10 +173,17 @@ def desired_datetime_to_utc(desired_datetime: datetime) -> datetime:
 
 
 def validate_booking_window(doctor: Doctor, desired_datetime: datetime) -> None:
+    """Valida a data pedida contra o passado e a janela de agendamento.
+
+    Levanta ValidationError (400). Antes era ValueError, que escapava para o
+    handler genérico e devolvia 500 ao paciente.
+    """
     config = _parse_config(doctor)
     local_datetime = desired_datetime_to_local(desired_datetime)
     now = datetime.now(ZoneInfo(settings.timezone))
-    if local_datetime.date() < now.date():
-        raise ValueError("Data desejada está no passado")
+    if local_datetime < now:
+        raise ValidationError("O horário escolhido está no passado")
     if local_datetime.date() > now.date() + timedelta(days=config.advance_booking_days):
-        raise ValueError("Data desejada excede a janela de agendamento")
+        raise ValidationError(
+            f"Este médico aceita agendamentos com no máximo {config.advance_booking_days} dias de antecedência"
+        )

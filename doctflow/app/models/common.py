@@ -63,20 +63,26 @@ def default_doctor_config() -> dict[str, object]:
 
 
 def normalize_br_phone(phone: str) -> str:
+    """Normaliza telefone brasileiro para E.164 (+55DDDNUMERO).
+
+    Aceita fixo (10 dígitos com DDD) e celular (11 dígitos com nono dígito),
+    com ou sem o prefixo de país 55 e com ou sem o "0" de operadora.
+    """
     digits = "".join(character for character in phone if character.isdigit())
-    if len(digits) == 11 and digits.startswith("0"):
+
+    # Remove o "0" de discagem interurbana (ex.: 011 99999-8888).
+    if len(digits) in (11, 12) and digits.startswith("0"):
         digits = digits[1:]
-    if len(digits) == 10:
-        raise ValueError("Telefone BR deve incluir DDD e nono dígito quando aplicável")
-    if len(digits) == 12 and digits.startswith("55"):
+
+    # Já veio com código do país: 55 + DDD(2) + número(8 fixo ou 9 celular).
+    if len(digits) in (12, 13) and digits.startswith("55"):
         return f"+{digits}"
-    if len(digits) == 13 and digits.startswith("55"):
-        return f"+{digits}"
-    if len(digits) == 11:
+
+    # Sem código do país: DDD(2) + número(8 fixo ou 9 celular).
+    if len(digits) in (10, 11):
         return f"+55{digits}"
-    if len(digits) == 10:
-        return f"+55{digits}"
-    raise ValueError("Telefone BR inválido")
+
+    raise ValueError("Telefone BR inválido: informe DDD + número (ex.: 11987654321)")
 
 
 def phone_digits(phone: str) -> str:

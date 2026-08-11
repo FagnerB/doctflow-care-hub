@@ -46,6 +46,10 @@ class AppointmentRead(BaseModel):
 
 
 class AppointmentPublicStatusResponse(BaseModel):
+    # Sem from_attributes o endpoint de status quebrava com 500 ao validar o
+    # objeto ORM vindo do banco.
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     status: AppointmentStatus
     scheduled_at: datetime
@@ -62,6 +66,12 @@ class AppointmentWebhookPayload(BaseModel):
     @classmethod
     def validate_phone(cls, value: str) -> str:
         return normalize_br_phone(value)
+
+
+class WebhookAckResponse(BaseModel):
+    success: bool = True
+    cancelled: bool = False
+    message: str = "Mensagem recebida."
 
 
 class ReminderRunResponse(BaseModel):

@@ -1,7 +1,11 @@
 import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Calendar, Users, Settings, LogOut, Stethoscope } from "lucide-react";
+import { useEffect } from "react";
+import { Calendar, CalendarOff, Users, Settings, LogOut, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { useLogout } from "@/hooks/use-auth";
+import { hasAccessToken } from "@/lib/auth-storage";
+import { useDoctorAppointments } from "@/hooks/use-appointments";
+import { useUnseenAppointmentsCount } from "@/hooks/use-unseen-appointments";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -13,20 +17,30 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
 });
 
-const navItems = [
-  { to: "/dashboard", label: "Agenda", icon: Calendar, exact: true },
-  { to: "/dashboard/patients", label: "Pacientes", icon: Users },
-  { to: "/dashboard/settings", label: "Configurações", icon: Settings },
-] as const;
-
 function DashboardLayout() {
   const navigate = useNavigate();
+  const logout = useLogout();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const handleLogout = () => {
-    toast.success("Sessão encerrada.");
-    navigate({ to: "/login" });
-  };
+  // Guarda de sessão client-side: sem token, não há por que renderizar o
+  // dashboard (toda chamada à API voltaria 401). Roda em efeito porque
+  // localStorage não existe durante o SSR — no servidor esta verificação
+  // sempre passaria batido, e é o cliente, após montar, quem redireciona.
+  useEffect(() => {
+    if (!hasAccessToken()) navigate({ to: "/login" });
+  }, [navigate]);
+
+  // Badge de "nova consulta": consulta a agenda periodicamente e compara com
+  // a quantidade já vista pelo médico (persistida em localStorage).
+  const appointmentsQuery = useDoctorAppointments({ refetchInterval: 30_000 });
+  const unseenCount = useUnseenAppointmentsCount(appointmentsQuery.data);
+
+  const navItems = [
+    { to: "/dashboard", label: "Agenda", icon: Calendar, exact: true, badge: unseenCount },
+    { to: "/dashboard/patients", label: "Pacientes", icon: Users },
+    { to: "/dashboard/exceptions", label: "Bloqueios", icon: CalendarOff },
+    { to: "/dashboard/settings", label: "Configurações", icon: Settings },
+  ] as const;
 
   const isActive = (to: string, exact?: boolean) =>
     exact ? pathname === to : pathname.startsWith(to);
@@ -49,21 +63,28 @@ function DashboardLayout() {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                   active
                     ? "bg-primary text-primary-foreground"
                     : "text-foreground hover:bg-secondary",
                 )}
               >
-                <item.icon className="h-4 w-4" />
-                {item.label}
+                <span className="flex items-center gap-3">
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </span>
+                {"badge" in item && item.badge > 0 && (
+                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-accent text-accent-foreground text-[11px] font-bold grid place-items-center">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
         </nav>
         <div className="p-3 border-t border-border">
           <button
-            onClick={handleLogout}
+            onClick={logout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-secondary w-full"
           >
             <LogOut className="h-4 w-4" /> Sair
@@ -79,7 +100,7 @@ function DashboardLayout() {
           </div>
           <span className="font-bold text-foreground">DoctFlow</span>
         </div>
-        <button onClick={handleLogout} aria-label="Sair" className="p-2 -mr-2 text-muted-foreground">
+        <button onClick={logout} aria-label="Sair" className="p-2 -mr-2 text-muted-foreground">
           <LogOut className="h-5 w-5" />
         </button>
       </header>
@@ -91,7 +112,7 @@ function DashboardLayout() {
 
       {/* Bottom nav mobile */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-background border-t border-border z-20">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {navItems.map((item) => {
             const active = isActive(item.to, "exact" in item ? item.exact : false);
             return (
@@ -99,12 +120,17 @@ function DashboardLayout() {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium",
+                  "relative flex flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium",
                   active ? "text-primary" : "text-muted-foreground",
                 )}
               >
                 <item.icon className="h-5 w-5" />
                 {item.label}
+                {"badge" in item && item.badge > 0 && (
+                  <span className="absolute top-1 right-1/4 min-w-4 h-4 px-1 rounded-full bg-accent text-accent-foreground text-[10px] font-bold grid place-items-center">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}

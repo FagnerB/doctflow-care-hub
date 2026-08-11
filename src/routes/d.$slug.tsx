@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { format, isBefore, startOfDay } from "date-fns";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { addDays, format, isBefore, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -17,22 +17,23 @@ import {
 import { TimeSlotGrid } from "@/components/TimeSlotGrid";
 import { PhoneInput, isValidPhone } from "@/components/PhoneInput";
 import { EmptyState } from "@/components/EmptyState";
-import { getAvailableSlots, mockDoctor } from "@/lib/mock-data";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CalendarPlus, CheckCircle2, Loader2, MessageCircle, Stethoscope, Sun, Moon } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Loader2, MessageCircle, Stethoscope, Sun, Moon, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/api-client";
+import { toBrasiliaDisplayDate } from "@/lib/timezone";
+import { weekdaysWithoutHours } from "@/lib/schedule-mapping";
+import { usePublicDoctor } from "@/hooks/use-doctor";
+import { useAvailability } from "@/hooks/use-availability";
+import { useCreatePublicAppointment } from "@/hooks/use-appointments";
+import type { Appointment, AvailabilitySlot, DoctorPublic } from "@/lib/api-types";
 
 export const Route = createFileRoute("/d/$slug")({
   head: ({ params }) => ({
     meta: [
-      { title: `Agendar consulta — ${mockDoctor.name}` },
-      {
-        name: "description",
-        content: `Agende sua consulta com ${mockDoctor.name} (${mockDoctor.specialty}) em 30 segundos.`,
-      },
-      { property: "og:title", content: `Agendar com ${mockDoctor.name}` },
-      { property: "og:description", content: `Agendamento online — /${params.slug}` },
+      { title: `Agendar consulta — ${params.slug}` },
+      { name: "description", content: "Agende sua consulta em 30 segundos." },
     ],
   }),
   component: BookingPage,
@@ -40,35 +41,72 @@ export const Route = createFileRoute("/d/$slug")({
 
 type Step = "pick" | "form" | "success";
 
+function groupSlotsByPeriod(slots: AvailabilitySlot[]) {
+  const morning: AvailabilitySlot[] = [];
+  const afternoon: AvailabilitySlot[] = [];
+  for (const slot of slots) {
+    const hour = toBrasiliaDisplayDate(slot.start_time).getHours();
+    (hour < 12 ? morning : afternoon).push(slot);
+  }
+  return { morning, afternoon };
+}
+
+function isDayDisabled(day: Date, doctor: DoctorPublic): boolean {
+  if (isBefore(day, startOfDay(new Date()))) return true;
+  const maxDate = addDays(startOfDay(new Date()), doctor.config_json.advance_booking_days);
+  if (day > maxDate) return true;
+  return weekdaysWithoutHours(doctor.config_json.working_hours).includes(day.getDay());
+}
+
 function BookingPage() {
+  const { slug } = Route.useParams();
+  const doctorQuery = usePublicDoctor(slug);
+  const doctor = doctorQuery.data;
+
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
+  const dateStr = date ? format(date, "yyyy-MM-dd") : "";
+  const availabilityQuery = useAvailability(slug, dateStr);
+
+  const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [step, setStep] = useState<Step>("pick");
   const [modalOpen, setModalOpen] = useState(false);
-  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
 
-  const doctor = mockDoctor;
-  const slots = date ? getAvailableSlots(date) : { morning: [], afternoon: [] };
-  const hasSlots = slots.morning.length + slots.afternoon.length > 0;
+  const slots = useMemo(() => availabilityQuery.data?.slots ?? [], [availabilityQuery.data]);
+  const { morning, afternoon } = useMemo(() => groupSlotsByPeriod(slots), [slots]);
+  const hasSlots = morning.length + afternoon.length > 0;
 
   const handleDateChange = (d: Date | undefined) => {
     setDate(d);
     setSelectedSlot(null);
-    if (d) {
-      setLoadingSlots(true);
-      setTimeout(() => setLoadingSlots(false), 300);
-    }
   };
 
-  const handleSlotSelect = (slot: Date) => {
+  const handleSlotSelect = (slot: AvailabilitySlot) => {
     setSelectedSlot(slot);
     setModalOpen(true);
     setStep("form");
   };
 
-  const handleConfirmed = () => {
+  const handleConfirmed = (appointment: Appointment) => {
+    setCreatedAppointment(appointment);
     setStep("success");
   };
+
+  if (doctorQuery.isLoading) {
+    return (
+      <div className="min-h-screen bg-secondary flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (doctorQuery.isError || !doctor) {
+    return (
+      <div className="min-h-screen bg-secondary flex items-center justify-center px-4">
+        <EmptyState icon={SearchX} title="Médico não encontrado" description="Verifique se o link está correto." />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-secondary">
@@ -81,9 +119,9 @@ function BookingPage() {
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-foreground truncate">{doctor.name}</h1>
+            <h1 className="text-xl font-bold text-foreground truncate">{doctor.full_name}</h1>
             <p className="text-sm text-primary font-medium">{doctor.specialty}</p>
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{doctor.bio}</p>
+            {doctor.bio && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{doctor.bio}</p>}
           </div>
         </div>
       </div>
@@ -99,7 +137,7 @@ function BookingPage() {
             mode="single"
             selected={date}
             onSelect={handleDateChange}
-            disabled={(d) => isBefore(d, startOfDay(new Date()))}
+            disabled={(d) => isDayDisabled(d, doctor)}
             locale={ptBR}
             className={cn("p-0 pointer-events-auto w-full")}
           />
@@ -111,31 +149,31 @@ function BookingPage() {
             <h2 className="text-sm font-semibold text-foreground mb-3">
               Horários em {format(date, "dd 'de' MMMM", { locale: ptBR })}
             </h2>
-            {loadingSlots ? (
+            {availabilityQuery.isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             ) : !hasSlots ? (
               <EmptyState
                 title="Sem horários disponíveis"
-                description={`${doctor.name} não possui horários disponíveis nesta data. Tente outra data.`}
+                description={`${doctor.full_name} não possui horários disponíveis nesta data. Tente outra data.`}
               />
             ) : (
               <div className="space-y-4">
-                {slots.morning.length > 0 && (
+                {morning.length > 0 && (
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       <Sun className="h-3.5 w-3.5" /> Manhã
                     </div>
-                    <TimeSlotGrid slots={slots.morning} selected={selectedSlot} onSelect={handleSlotSelect} />
+                    <SlotGrid slots={morning} selected={selectedSlot} onSelect={handleSlotSelect} />
                   </div>
                 )}
-                {slots.afternoon.length > 0 && (
+                {afternoon.length > 0 && (
                   <div>
                     <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       <Moon className="h-3.5 w-3.5" /> Tarde
                     </div>
-                    <TimeSlotGrid slots={slots.afternoon} selected={selectedSlot} onSelect={handleSlotSelect} />
+                    <SlotGrid slots={afternoon} selected={selectedSlot} onSelect={handleSlotSelect} />
                   </div>
                 )}
               </div>
@@ -145,19 +183,26 @@ function BookingPage() {
       </main>
 
       {/* Modal de confirmação */}
-      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setStep("pick"); }}>
+      <Dialog
+        open={modalOpen}
+        onOpenChange={(o) => {
+          setModalOpen(o);
+          if (!o) setStep("pick");
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           {step === "form" && selectedSlot && (
-            <BookingForm
-              slot={selectedSlot}
-              doctorName={doctor.name}
-              onSuccess={handleConfirmed}
-            />
+            <BookingForm slot={selectedSlot} doctorSlug={slug} doctorName={doctor.full_name} onSuccess={handleConfirmed} />
           )}
-          {step === "success" && selectedSlot && (
+          {step === "success" && selectedSlot && createdAppointment && (
             <SuccessScreen
               slot={selectedSlot}
-              onClose={() => { setModalOpen(false); setStep("pick"); setSelectedSlot(null); }}
+              appointment={createdAppointment}
+              onClose={() => {
+                setModalOpen(false);
+                setStep("pick");
+                setSelectedSlot(null);
+              }}
             />
           )}
         </DialogContent>
@@ -166,20 +211,48 @@ function BookingPage() {
   );
 }
 
+// Adapta AvailabilitySlot (start_time ISO) para o componente TimeSlotGrid, que
+// trabalha com Date de exibição — sem tocar no ISO original, que segue junto
+// no `slot` selecionado para ser enviado à API sem reconstrução.
+function SlotGrid({
+  slots,
+  selected,
+  onSelect,
+}: {
+  slots: AvailabilitySlot[];
+  selected: AvailabilitySlot | null;
+  onSelect: (slot: AvailabilitySlot) => void;
+}) {
+  const displayDates = slots.map((slot) => toBrasiliaDisplayDate(slot.start_time));
+  const selectedDisplay = selected ? toBrasiliaDisplayDate(selected.start_time) : null;
+  return (
+    <TimeSlotGrid
+      slots={displayDates}
+      selected={selectedDisplay}
+      onSelect={(displayDate) => {
+        const index = displayDates.findIndex((d) => d.getTime() === displayDate.getTime());
+        if (index >= 0) onSelect(slots[index]);
+      }}
+    />
+  );
+}
+
 function BookingForm({
   slot,
+  doctorSlug,
   doctorName,
   onSuccess,
 }: {
-  slot: Date;
+  slot: AvailabilitySlot;
+  doctorSlug: string;
   doctorName: string;
-  onSuccess: () => void;
+  onSuccess: (appointment: Appointment) => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
-  const [loading, setLoading] = useState(false);
+  const createAppointment = useCreatePublicAppointment();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,13 +262,22 @@ function BookingForm({
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
-    setLoading(true);
-    // Simula chamada de API
-    setTimeout(() => {
-      setLoading(false);
-      toast.success("Consulta agendada com sucesso!");
-      onSuccess();
-    }, 800);
+    createAppointment.mutate(
+      {
+        doctor_slug: doctorSlug,
+        patient_name: name,
+        patient_phone: phone,
+        patient_email: email || undefined,
+        desired_datetime: slot.start_time,
+      },
+      {
+        onSuccess: (appointment) => {
+          toast.success("Consulta agendada com sucesso!");
+          onSuccess(appointment);
+        },
+        onError: (error) => toast.error(getErrorMessage(error)),
+      },
+    );
   };
 
   return (
@@ -203,7 +285,7 @@ function BookingForm({
       <DialogHeader>
         <DialogTitle>Confirmar agendamento</DialogTitle>
         <DialogDescription>
-          {doctorName} · {format(slot, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+          {doctorName} · {format(toBrasiliaDisplayDate(slot.start_time), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
@@ -218,12 +300,7 @@ function BookingForm({
           />
           {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
         </div>
-        <PhoneInput
-          label="WhatsApp"
-          value={phone}
-          onChange={setPhone}
-          error={errors.phone}
-        />
+        <PhoneInput label="WhatsApp" value={phone} onChange={setPhone} error={errors.phone} />
         <div className="space-y-1.5">
           <Label htmlFor="email">Email (opcional)</Label>
           <Input
@@ -238,17 +315,25 @@ function BookingForm({
       <DialogFooter>
         <Button
           type="submit"
-          disabled={loading}
+          disabled={createAppointment.isPending}
           className="w-full bg-accent text-accent-foreground hover:bg-accent/90 h-11"
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar agendamento"}
+          {createAppointment.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar agendamento"}
         </Button>
       </DialogFooter>
     </form>
   );
 }
 
-function SuccessScreen({ slot, onClose }: { slot: Date; onClose: () => void }) {
+function SuccessScreen({
+  slot,
+  appointment,
+  onClose,
+}: {
+  slot: AvailabilitySlot;
+  appointment: Appointment;
+  onClose: () => void;
+}) {
   return (
     <div className="text-center py-4">
       <div className="mx-auto h-16 w-16 rounded-full bg-success/10 grid place-items-center mb-4">
@@ -256,17 +341,18 @@ function SuccessScreen({ slot, onClose }: { slot: Date; onClose: () => void }) {
       </div>
       <h2 className="text-xl font-bold text-foreground">Consulta confirmada! ✅</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        {format(slot, "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+        {format(toBrasiliaDisplayDate(slot.start_time), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
       </p>
       <div className="mt-6 flex items-center gap-2 rounded-lg bg-secondary p-3 text-sm text-foreground">
         <MessageCircle className="h-5 w-5 text-primary shrink-0" />
         <span className="text-left">Você receberá lembretes pelo WhatsApp.</span>
       </div>
       <div className="mt-4 flex flex-col gap-2">
-        <Button variant="outline" className="w-full" onClick={() => toast.info("Em breve: integração com Google Calendar")}>
-          <CalendarPlus className="h-4 w-4 mr-1.5" />
-          Adicionar ao Google Calendar
-        </Button>
+        <Link to="/appointment/$id" params={{ id: appointment.id }} className="w-full">
+          <Button variant="outline" className="w-full">
+            Ver minha consulta
+          </Button>
+        </Link>
         <Button className="w-full" onClick={onClose}>Fechar</Button>
       </div>
     </div>

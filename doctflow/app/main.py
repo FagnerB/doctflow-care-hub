@@ -15,7 +15,8 @@ from sqlalchemy import text
 from app.config import settings
 from app.database import engine
 from app.exceptions import AppError
-from app.routers import admin, appointments, auth, doctors, patients, schedules
+from app.routers import admin, appointments, auth, doctors, patients, schedules, tasks, webhooks
+from app.tasks.reminder_jobs import ReminderScheduler
 
 
 class JsonLogFormatter(logging.Formatter):
@@ -52,8 +53,20 @@ def configure_logging() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    yield
-    await engine.dispose()
+
+    # Scheduler interno de lembretes. Desligue (REMINDERS_SCHEDULER_ENABLED=false)
+    # se for acionar por cron externo ou rodar mais de uma réplica da API.
+    scheduler: ReminderScheduler | None = None
+    if settings.reminders_scheduler_enabled:
+        scheduler = ReminderScheduler()
+        scheduler.start()
+
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            await scheduler.stop()
+        await engine.dispose()
 
 
 app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
@@ -65,6 +78,8 @@ app.include_router(patients.router, prefix=settings.api_prefix)
 app.include_router(appointments.router, prefix=settings.api_prefix)
 app.include_router(schedules.router, prefix=settings.api_prefix)
 app.include_router(admin.router, prefix=settings.api_prefix)
+app.include_router(webhooks.router, prefix=settings.api_prefix)
+app.include_router(tasks.router, prefix=settings.api_prefix)
 
 
 @app.exception_handler(AppError)

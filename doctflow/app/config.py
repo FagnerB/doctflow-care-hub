@@ -41,12 +41,34 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_whatsapp_from: str = ""
+    # Valida a assinatura X-Twilio-Signature do webhook. Só desligue em teste local.
+    twilio_validate_signature: bool = True
+    # URL pública exata que a Twilio chama; usada no cálculo da assinatura.
+    # Se vazia, cai para a URL vista pelo request (pode falhar atrás de proxy).
+    twilio_webhook_url: str = ""
+
+    # Caminho no frontend onde o médico define a nova senha (link do e-mail).
+    password_reset_path: str = "/reset-password"
+    # Segredo do endpoint de cron dos lembretes (header X-Cron-Secret).
+    # Vazio = endpoint de cron desabilitado.
+    cron_secret: str = ""
+    # Scheduler interno de lembretes (roda dentro do processo da API).
+    reminders_scheduler_enabled: bool = True
+    reminders_interval_minutes: int = 60
+    # Tolerância da janela de busca de lembretes; precisa ser >= o intervalo
+    # do scheduler, senão consultas caem entre duas execuções e não recebem aviso.
+    reminders_window_minutes: int = 75
 
     cors_origins: str = "http://localhost:3000"
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def password_reset_url(self) -> str:
+        """URL para onde o Supabase redireciona após o clique no e-mail de reset."""
+        return f"{self.frontend_url.rstrip('/')}{self.password_reset_path}"
 
 
 @lru_cache(maxsize=1)

@@ -5,10 +5,18 @@ from app.schemas.appointment import (
     AppointmentStatusUpdate,
     AppointmentWebhookPayload,
     ReminderRunResponse,
+    WebhookAckResponse,
 )
 from app.schemas.doctor import DoctorConfig, DoctorCreate, DoctorPublic, DoctorRead, DoctorUpdate, TimeWindow
 from app.schemas.patient import PatientCreate, PatientRead
-from app.schemas.schedule import AvailabilityResponse, AvailabilitySlot, ScheduleExceptionCreate, ScheduleExceptionRead
+from app.schemas.schedule import (
+    AvailabilityResponse,
+    AvailabilitySlot,
+    DoctorStatsResponse,
+    ScheduleExceptionCreate,
+    ScheduleExceptionRead,
+    UpcomingAppointmentSummary,
+)
 from app.schemas.user import (
     AuthLoginRequest,
     AuthRefreshRequest,
@@ -16,6 +24,8 @@ from app.schemas.user import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     MeResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     TokenPairResponse,
     UserRead,
 )
@@ -35,6 +45,7 @@ __all__ = [
     "DoctorPublic",
     "DoctorRead",
     "DoctorRegisterRequest",
+    "DoctorStatsResponse",
     "DoctorUpdate",
     "ForgotPasswordRequest",
     "ForgotPasswordResponse",
@@ -42,9 +53,13 @@ __all__ = [
     "PatientCreate",
     "PatientRead",
     "ReminderRunResponse",
+    "ResetPasswordRequest",
+    "ResetPasswordResponse",
     "ScheduleExceptionCreate",
     "ScheduleExceptionRead",
     "TimeWindow",
     "TokenPairResponse",
+    "UpcomingAppointmentSummary",
     "UserRead",
+    "WebhookAckResponse",
 ]

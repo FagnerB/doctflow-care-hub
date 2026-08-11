@@ -14,7 +14,7 @@ from app.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from app.models.common import UserRole, normalize_br_phone
 from app.models.doctor import Doctor
 from app.models.user import User
-from app.schemas.user import DoctorRegisterRequest, UserRead
+from app.services.email_service import email_service
 
 
 class SupabaseIntegrationError(UnauthorizedError):
@@ -92,16 +92,63 @@ class AuthService:
         return response.json()
 
     async def forgot_password(self, email: str) -> None:
+        """Solicita o e-mail de recuperação de senha.
+
+        Não propaga erro: a resposta ao cliente é sempre genérica para que não
+        seja possível descobrir quais e-mails têm conta (enumeração de usuários).
+        Falhas reais ficam registradas no log pelo EmailService.
+        """
+        await email_service.send_password_recovery(email)
+
+    async def reset_password(
+        self,
+        new_password: str,
+        *,
+        access_token: str | None = None,
+        token_hash: str | None = None,
+        verify_type: str = "recovery",
+    ) -> None:
+        """Efetiva a nova senha no Supabase Auth.
+
+        Aceita os dois formatos que o link do e-mail pode entregar ao frontend:
+        - `access_token`: token de recuperação já presente no fragmento da URL;
+        - `token_hash`: precisa ser trocado por um access_token via /verify.
+
+        `verify_type` precisa bater com o tipo real do token — o link de
+        primeiro acesso (convite) chega como `type=invite`, o de "esqueci minha
+        senha" como `type=recovery`. O Supabase rejeita a verificação se o tipo
+        não corresponder ao que foi usado para gerar o token.
+        """
         if not settings.supabase_url or not settings.supabase_anon_key:
             raise SupabaseIntegrationError("Supabase não configurado")
 
-        url = f"{settings.supabase_url.rstrip('/')}/auth/v1/recover"
+        if not access_token and not token_hash:
+            raise UnauthorizedError("Token de recuperação ausente")
+
+        base_url = settings.supabase_url.rstrip("/")
         headers = {"apikey": settings.supabase_anon_key, "Content-Type": "application/json"}
-        payload = {"email": email, "redirect_to": settings.frontend_url}
+
         async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(url, headers=headers, json=payload)
-        if not response.is_success:
-            raise UnauthorizedError("Falha ao solicitar recuperação de senha")
+            if not access_token:
+                verify_response = await client.post(
+                    f"{base_url}/auth/v1/verify",
+                    headers=headers,
+                    json={"type": verify_type, "token_hash": token_hash},
+                )
+                if not verify_response.is_success:
+                    raise UnauthorizedError("Link de recuperação inválido ou expirado")
+                access_token = verify_response.json().get("access_token")
+                if not access_token:
+                    raise UnauthorizedError("Link de recuperação inválido ou expirado")
+
+            update_response = await client.put(
+                f"{base_url}/auth/v1/user",
+                headers={**headers, "Authorization": f"Bearer {access_token}"},
+                json={"password": new_password},
+            )
+
+        if not update_response.is_success:
+            raise UnauthorizedError("Não foi possível redefinir a senha. Solicite um novo link.")
 
     async def create_supabase_user(self, email: str, full_name: str, phone: str, role: UserRole) -> str:
         if not settings.supabase_url or not settings.supabase_service_role_key:

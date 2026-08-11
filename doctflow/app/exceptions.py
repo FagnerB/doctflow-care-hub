@@ -6,6 +6,13 @@ class AppError(Exception):
         self.status_code = status_code
 
 
+class ValidationError(AppError):
+    """Erro de regra de negócio na entrada — vira 400, não 500."""
+
+    def __init__(self, message: str = "Dados inválidos", code: str = "validation_error") -> None:
+        super().__init__(message, code=code, status_code=400)
+
+
 class NotFoundError(AppError):
     def __init__(self, message: str = "Recurso não encontrado", code: str = "not_found") -> None:
         super().__init__(message, code=code, status_code=404)

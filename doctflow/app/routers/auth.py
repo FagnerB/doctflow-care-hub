@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.dependencies import get_current_user, get_db_session, require_owner
+from app.dependencies import get_current_user, get_db_session, rate_limit_auth, require_owner
 from app.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from app.models.common import UserRole
 from app.models.doctor import Doctor
@@ -18,6 +18,8 @@ from app.schemas.user import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     MeResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     TokenPairResponse,
 )
 from app.services.auth_service import auth_service
@@ -85,10 +87,35 @@ async def refresh_tokens(payload: AuthRefreshRequest, session: AsyncSession = De
     return TokenPairResponse(access_token=access_token, refresh_token=refresh_token, expires_in=expires_in, user=user)
 
 
-@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    dependencies=[Depends(rate_limit_auth)],
+)
 async def forgot_password(payload: ForgotPasswordRequest) -> ForgotPasswordResponse:
+    """Envia o e-mail com o link de redefinição de senha.
+
+    Responde sempre 200 com a mesma mensagem, exista ou não a conta — assim o
+    endpoint não vira um oráculo para descobrir e-mails cadastrados.
+    """
     await auth_service.forgot_password(payload.email)
     return ForgotPasswordResponse()
+
+
+@router.post(
+    "/reset-password",
+    response_model=ResetPasswordResponse,
+    dependencies=[Depends(rate_limit_auth)],
+)
+async def reset_password(payload: ResetPasswordRequest) -> ResetPasswordResponse:
+    """Define a nova senha a partir do token recebido no e-mail de recuperação."""
+    await auth_service.reset_password(
+        payload.new_password,
+        access_token=payload.access_token,
+        token_hash=payload.token_hash,
+        verify_type=payload.type,
+    )
+    return ResetPasswordResponse()
 
 
 @router.get("/me", response_model=MeResponse)

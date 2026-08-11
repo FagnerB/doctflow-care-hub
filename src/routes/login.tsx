@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Stethoscope, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLogin } from "@/hooks/use-auth";
+import { getErrorMessage } from "@/lib/api-client";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -18,9 +20,9 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const login = useLogin();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,12 +30,16 @@ function LoginPage() {
       toast.error("Preencha email e senha.");
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      toast.success("Bem-vindo(a) de volta!");
-      navigate({ to: "/dashboard" });
-    }, 600);
+    login.mutate(
+      { email, password },
+      {
+        onSuccess: () => {
+          toast.success("Bem-vindo(a) de volta!");
+          navigate({ to: "/dashboard" });
+        },
+        onError: (error) => toast.error(getErrorMessage(error)),
+      },
+    );
   };
 
   return (
@@ -67,9 +73,9 @@ function LoginPage() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Senha</Label>
-                <a href="#" className="text-xs text-primary hover:underline">
+                <Link to="/forgot-password" className="text-xs text-primary hover:underline">
                   Esqueci minha senha
-                </a>
+                </Link>
               </div>
               <Input
                 id="password"
@@ -79,8 +85,8 @@ function LoginPage() {
                 autoComplete="current-password"
               />
             </div>
-            <Button type="submit" className="w-full h-11" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}
+            <Button type="submit" className="w-full h-11" disabled={login.isPending}>
+              {login.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}
             </Button>
           </form>
 

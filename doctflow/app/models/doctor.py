@@ -3,13 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.common import default_doctor_config
+
+# Produção é Postgres (JSONB); a variante JSON permite rodar os testes em SQLite.
+DoctorConfigJSON = JSONB().with_variant(JSON(), "sqlite")
 
 
 class Doctor(Base):
@@ -23,7 +26,7 @@ class Doctor(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     config_json: Mapped[dict[str, object]] = mapped_column(
-        MutableDict.as_mutable(JSONB),
+        MutableDict.as_mutable(DoctorConfigJSON),
         nullable=False,
         default=default_doctor_config,
     )

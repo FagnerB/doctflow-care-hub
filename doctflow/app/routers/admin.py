@@ -3,12 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import case, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import get_db_session, require_owner
-from app.exceptions import ConflictError
+from app.exceptions import ConflictError, NotFoundError
 from app.models.appointment import Appointment
 from app.models.common import AppointmentStatus, UserRole
 from app.models.doctor import Doctor
@@ -17,6 +17,7 @@ from app.schemas.appointment import ReminderRunResponse
 from app.schemas.doctor import DoctorCreate, DoctorListResponse, DoctorRead
 from app.services.appointment_service import appointment_service
 from app.services.auth_service import auth_service
+from app.services.email_service import email_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -115,6 +116,21 @@ async def run_reminders(
     session: AsyncSession = Depends(get_db_session),
     _: User = Depends(require_owner),
 ) -> ReminderRunResponse:
+    """Dispara os lembretes manualmente (owner). O cron externo usa /api/tasks/reminders/run."""
     sent, failed = await appointment_service.run_reminders(session)
     await session.commit()
     return ReminderRunResponse(sent=sent, failed=failed)
+
+
+@router.post("/doctors/{doctor_id}/invite", response_model=dict)
+async def resend_doctor_invite(
+    doctor_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    _: User = Depends(require_owner),
+) -> dict[str, object]:
+    """Reenvia ao médico o e-mail de primeiro acesso (definição de senha)."""
+    doctor = await session.scalar(select(Doctor).options(selectinload(Doctor.user)).where(Doctor.id == doctor_id))
+    if doctor is None:
+        raise NotFoundError("Médico não encontrado")
+    result = await email_service.send_doctor_invite(doctor.user.email)
+    return {"success": result.ok, "provider": result.provider, "error": result.error_message}

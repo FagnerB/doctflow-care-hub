@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,33 +13,79 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Copy, Loader2, Stethoscope, Upload } from "lucide-react";
+import { Copy, Loader2, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { WeeklySchedule, defaultWeeklyHours, type WeeklyHours } from "@/components/WeeklySchedule";
+import { useDoctorProfile, useUpdateDoctorProfile } from "@/hooks/use-doctor";
+import { getErrorMessage } from "@/lib/api-client";
+import { weeklyHoursToWorkingHours, workingHoursToWeeklyHours } from "@/lib/schedule-mapping";
 
 export const Route = createFileRoute("/dashboard/settings")({
   component: SettingsPage,
 });
 
 function SettingsPage() {
-  const [name, setName] = useState("Dr. Rafael Silva");
-  const [specialty, setSpecialty] = useState("Cardiologia");
-  const [bio, setBio] = useState("Cardiologista há 12 anos. Atendimento humanizado.");
+  const profileQuery = useDoctorProfile();
+  const updateProfile = useUpdateDoctorProfile();
+  const profile = profileQuery.data;
+
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [specialty, setSpecialty] = useState("");
+  const [bio, setBio] = useState("");
   const [hours, setHours] = useState<WeeklyHours>(defaultWeeklyHours());
   const [autoConfirm, setAutoConfirm] = useState(true);
   const [duration, setDuration] = useState("30");
   const [horizon, setHorizon] = useState("30");
-  const [saving, setSaving] = useState(false);
-  const slug = "dr-silva";
-  const link = `doctflow.com/d/${slug}`;
+  const [cancellationHours, setCancellationHours] = useState("24");
+
+  // Preenche o formulário quando o perfil chega da API (só uma vez por carregamento).
+  useEffect(() => {
+    if (!profile) return;
+    setName(profile.user.full_name);
+    setPhone(profile.user.phone);
+    setSpecialty(profile.specialty);
+    setBio(profile.bio ?? "");
+    setHours(workingHoursToWeeklyHours(profile.config_json.working_hours));
+    setAutoConfirm(profile.config_json.auto_confirm);
+    setDuration(String(profile.config_json.consultation_duration_minutes));
+    setHorizon(String(profile.config_json.advance_booking_days));
+    setCancellationHours(String(profile.config_json.cancellation_policy_hours));
+  }, [profile]);
+
+  const publicLink =
+    typeof window !== "undefined" && profile ? `${window.location.origin}/d/${profile.slug}` : "";
 
   const save = () => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      toast.success("Alterações salvas!");
-    }, 600);
+    if (!profile) return;
+    updateProfile.mutate(
+      {
+        full_name: name,
+        phone,
+        specialty,
+        bio,
+        config_json: {
+          consultation_duration_minutes: Number(duration),
+          advance_booking_days: Number(horizon),
+          auto_confirm: autoConfirm,
+          cancellation_policy_hours: Number(cancellationHours),
+          working_hours: weeklyHoursToWorkingHours(hours),
+        },
+      },
+      {
+        onSuccess: () => toast.success("Alterações salvas!"),
+        onError: (error) => toast.error(getErrorMessage(error)),
+      },
+    );
   };
+
+  if (profileQuery.isLoading) {
+    return (
+      <div className="p-4 md:p-6 flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-3xl">
@@ -56,7 +102,7 @@ function SettingsPage() {
               </AvatarFallback>
             </Avatar>
             <Button variant="outline" size="sm" onClick={() => toast.info("Em breve: upload de avatar")}>
-              <Upload className="h-4 w-4 mr-1.5" /> Enviar foto
+              Enviar foto
             </Button>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
@@ -70,6 +116,10 @@ function SettingsPage() {
             </div>
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="phone">Telefone (WhatsApp)</Label>
+            <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="bio">Bio</Label>
             <Textarea id="bio" value={bio} onChange={(e) => setBio(e.target.value)} rows={3} />
           </div>
@@ -78,12 +128,12 @@ function SettingsPage() {
         {/* Seu link */}
         <Section title="Seu link público">
           <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary p-3">
-            <code className="flex-1 text-sm text-foreground truncate">{link}</code>
+            <code className="flex-1 text-sm text-foreground truncate">{publicLink}</code>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => {
-                navigator.clipboard?.writeText(link);
+                navigator.clipboard?.writeText(publicLink);
                 toast.success("Link copiado!");
               }}
             >
@@ -109,7 +159,7 @@ function SettingsPage() {
             <Switch checked={autoConfirm} onCheckedChange={setAutoConfirm} />
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label>Duração da consulta</Label>
               <Select value={duration} onValueChange={setDuration}>
@@ -134,12 +184,25 @@ function SettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label>Cancelamento até</Label>
+              <Select value={cancellationHours} onValueChange={setCancellationHours}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Sem prazo mínimo</SelectItem>
+                  <SelectItem value="6">6 horas antes</SelectItem>
+                  <SelectItem value="12">12 horas antes</SelectItem>
+                  <SelectItem value="24">24 horas antes</SelectItem>
+                  <SelectItem value="48">48 horas antes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </Section>
 
         <div className="flex justify-end">
-          <Button className="h-11 px-6" onClick={save} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar alterações"}
+          <Button className="h-11 px-6" onClick={save} disabled={updateProfile.isPending}>
+            {updateProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar alterações"}
           </Button>
         </div>
       </div>

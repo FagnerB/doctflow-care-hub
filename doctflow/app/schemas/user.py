@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.models.common import UserRole, normalize_br_phone
 
@@ -47,6 +47,32 @@ class AuthRefreshRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Payload da tela "definir nova senha".
+
+    O frontend recebe do link do e-mail um `access_token` (fragmento da URL) ou
+    um `token_hash` (query string) e repassa aqui junto da nova senha.
+    """
+
+    new_password: str = Field(min_length=8, max_length=255)
+    access_token: str | None = None
+    token_hash: str | None = None
+    # O Supabase inclui `type` na URL do link (recovery | invite | email_change).
+    # Só é usado quando token_hash precisa ser verificado; com access_token é ignorado.
+    type: str = "recovery"
+
+    @model_validator(mode="after")
+    def require_token(self) -> "ResetPasswordRequest":
+        if not self.access_token and not self.token_hash:
+            raise ValueError("Informe access_token ou token_hash do link de recuperação")
+        return self
+
+
+class ResetPasswordResponse(BaseModel):
+    success: bool = True
+    message: str = "Senha redefinida com sucesso. Faça login com a nova senha."
 
 
 class DoctorRegisterRequest(UserBase):

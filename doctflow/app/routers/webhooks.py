@@ -102,7 +102,7 @@ async def _handle_cancellation(session: AsyncSession, phone: str, message: str) 
         # Não é erro de integração: o provedor deve receber 200 mesmo assim,
         # senão fica reentregando o mesmo evento. Explicamos ao paciente.
         await session.rollback()
-        logger.info("webhook_cancel_rejected", extra={"phone": phone, "message": exc.message})
+        logger.info("webhook_cancel_rejected", extra={"phone": phone, "reason": exc.message})
         return False, exc.message
 
     await appointment_service.send_cancellation_notifications(session, appointment)

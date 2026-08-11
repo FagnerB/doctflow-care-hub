@@ -74,7 +74,9 @@ class NotificationService:
         # Modo MVP: sem credencial, apenas loga para não bloquear o fluxo.
         logger.info(
             "whatsapp_notification_mock",
-            extra={"phone": phone, "message": message, "provider": "console", "reason": reason},
+            # "message" é chave reservada do próprio módulo logging (colide com
+            # LogRecord.message) — usar esse nome em `extra` sempre lança KeyError.
+            extra={"phone": phone, "whatsapp_message": message, "provider": "console", "reason": reason},
         )
         return DeliveryResult(ok=True, provider="console")
 

@@ -4,7 +4,6 @@ from sqlalchemy import MetaData
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
@@ -38,21 +37,33 @@ def _connect_args(database_url: str) -> dict[str, object]:
     trás dos panos entre transações, e o cache de prepared statements do
     asyncpg (por conexão) fica referenciando um statement que já não existe
     (ou colide com outro) na conexão física seguinte.
+
+    `timeout` maior porque o backend (Railway, US) e o Postgres (Supabase,
+    sa-east-1) ficam em continentes diferentes — o handshake TCP+TLS+auth
+    sozinho já consome boa parte do timeout padrão de 60s do asyncpg sob
+    latência alta; folga extra evita timeout prematuro numa conexão que só
+    está lenta, não morta.
     """
-    return {"statement_cache_size": 0} if _is_asyncpg(database_url) else {}
+    if not _is_asyncpg(database_url):
+        return {}
+    return {"statement_cache_size": 0, "timeout": 30, "command_timeout": 30}
 
 
 def _engine_kwargs(database_url: str) -> dict[str, object]:
-    """Contra um pooler externo (Transaction Pooler do Supabase), o pool de
-    conexões do próprio SQLAlchemy só duplica o pooling e some estressa o
-    limite de conexões do lado do Supabase — cada instância abriria até
-    pool_size + max_overflow conexões próprias, por cima do que o pooler já
-    gerencia. NullPool tira o SQLAlchemy dessa conta: uma conexão por
-    checkout, devolvida (fechada) no commit/rollback, deixando o pooler
-    externo cuidar de tudo. Localmente (SQLite) isso não se aplica.
+    """Pool pequeno e reaproveitável, não NullPool.
+
+    NullPool parecia a escolha "correta" contra um pooler externo (evita
+    duplicar pooling), mas nessa distância Railway↔Supabase o handshake de
+    conexão nova é a parte mais frágil — NullPool paga esse custo em TODA
+    requisição. Testado: 8/8 sucesso chamando o serviço direto (uma conexão
+    de cada vez, sem HTTP no meio) contra ~20% de sucesso passando pelo
+    endpoint real. Um pool pequeno mantém poucas conexões já autenticadas
+    vivas entre requisições, pagando o handshake caro raramente em vez de
+    sempre. `pool_pre_ping` descarta uma conexão morta do pool antes de
+    usá-la, em vez de tentar uma query nela e falhar.
     """
     if _is_asyncpg(database_url):
-        return {"poolclass": NullPool}
+        return {"pool_size": 3, "max_overflow": 2, "pool_pre_ping": True, "pool_recycle": 300}
     return {"pool_pre_ping": True}
 
 

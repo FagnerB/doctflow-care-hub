@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +10,22 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_whitespace(cls, data: object) -> object:
+        """Remove espaço/quebra de linha nas pontas de toda variável de ambiente.
+
+        Copiar um valor de um bloco de código (ex.: uma DATABASE_URL) costuma
+        trazer uma quebra de linha invisível no final. Isso já causou
+        `InvalidCatalogNameError: database "postgres\\n" does not exist` em
+        produção — a variável parecia certa no painel do Railway, mas tinha
+        um caractere de controle colado no fim. Mais seguro sanear aqui do
+        que confiar que toda edição futura de env var vai vir limpa.
+        """
+        if not isinstance(data, dict):
+            return data
+        return {key: value.strip() if isinstance(value, str) else value for key, value in data.items()}
 
     app_name: str = "DoctFlow API"
     api_prefix: str = "/api"

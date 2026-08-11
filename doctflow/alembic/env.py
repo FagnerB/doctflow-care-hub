@@ -8,7 +8,7 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.config import settings
-from app.database import Base
+from app.database import Base, _connect_args
 import app.models  # noqa: F401
 
 config = context.config
@@ -40,10 +40,15 @@ def do_run_migrations(connection) -> None:
 
 
 def run_migrations_online() -> None:
+    # connect_args idêntico ao de app/database.py: sem isso, migrations contra
+    # a Transaction Pooler do Supabase falham com DuplicatePreparedStatementError
+    # na segunda instrução (asyncpg usa prepared statements por padrão, o que
+    # não é compatível com PgBouncer em modo transaction).
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section) or {},
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=_connect_args(settings.database_url),
     )
 
     async def run_async_migrations() -> None:

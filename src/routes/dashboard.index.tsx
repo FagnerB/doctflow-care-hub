@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/api-client";
 import { toBrasiliaDisplayDate } from "@/lib/timezone";
 import { useDoctorAppointments, useUpdateAppointmentStatus } from "@/hooks/use-appointments";
+import { useDoctorStats } from "@/hooks/use-doctor";
 import { useCreateException, useExceptions } from "@/hooks/use-exceptions";
 import { markAppointmentsAsSeen } from "@/hooks/use-unseen-appointments";
 import type { Appointment, AppointmentStatus } from "@/lib/api-types";
@@ -60,6 +62,7 @@ const CANCELLED: AppointmentStatus[] = ["cancelled_by_patient", "cancelled_by_do
 
 function AgendaPage() {
   const appointmentsQuery = useDoctorAppointments();
+  const statsQuery = useDoctorStats();
   const exceptionsQuery = useExceptions();
   const updateStatus = useUpdateAppointmentStatus();
   const createException = useCreateException();
@@ -136,6 +139,22 @@ function AgendaPage() {
           <CalendarOff className="h-4 w-4 mr-1.5" />
           {isDayFullyBlocked ? "Dia já bloqueado" : "Bloquear dia"}
         </Button>
+      </div>
+
+      {/* Cards de estatísticas do mês */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <StatCard
+          label="Consultas no mês"
+          value={statsQuery.data?.total_appointments}
+          loading={statsQuery.isLoading}
+        />
+        <StatCard
+          label="Comparecimento"
+          value={statsQuery.data ? `${statsQuery.data.attendance_rate}%` : undefined}
+          loading={statsQuery.isLoading}
+        />
+        <StatCard label="Faltas" value={statsQuery.data?.no_show} loading={statsQuery.isLoading} />
+        <StatCard label="Canceladas" value={statsQuery.data?.cancelled} loading={statsQuery.isLoading} />
       </div>
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-4">
@@ -285,6 +304,27 @@ function AgendaPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  loading,
+}: {
+  label: string;
+  value: string | number | undefined;
+  loading: boolean;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-3 md:p-4">
+        <div className="text-xs text-muted-foreground truncate">{label}</div>
+        <div className="mt-1 text-xl md:text-2xl font-bold text-foreground">
+          {loading ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : value ?? "—"}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

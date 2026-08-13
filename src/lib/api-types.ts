@@ -108,6 +108,9 @@ export interface AppointmentPublicStatus {
   duration_minutes: number;
   confirmation_sent_at: string | null;
   reminder_sent_at: string | null;
+  doctor_full_name: string;
+  patient_name: string;
+  patient_phone: string;
 }
 
 export interface AvailabilitySlot {

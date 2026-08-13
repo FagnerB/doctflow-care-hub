@@ -153,7 +153,12 @@ async def test_status_publico_da_consulta(client, doctor) -> None:
     appointment_id = criada.json()["id"]
     response = await client.get(f"/api/appointments/{appointment_id}/status")
     assert response.status_code == 200
-    assert response.json()["status"] == "confirmed"
+    body = response.json()
+    assert body["status"] == "confirmed"
+    # A tela pública /appointment/:id precisa saber com quem é a consulta.
+    assert body["doctor_full_name"] == "Ana Silva"
+    assert body["patient_name"] == "Carlos Souza"
+    assert body["patient_phone"] == "+5511912345678"
 
 
 async def test_medico_inexistente_retorna_404(client) -> None:

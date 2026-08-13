@@ -70,7 +70,17 @@ async def get_public_status(
 ) -> AppointmentPublicStatusResponse:
     """Status da consulta pelo link enviado ao paciente (id UUID funciona como token)."""
     appointment = await appointment_service.get_public_status(session, appointment_id)
-    return AppointmentPublicStatusResponse.model_validate(appointment)
+    return AppointmentPublicStatusResponse(
+        id=appointment.id,
+        status=appointment.status,
+        scheduled_at=appointment.scheduled_at,
+        duration_minutes=appointment.duration_minutes,
+        confirmation_sent_at=appointment.confirmation_sent_at,
+        reminder_sent_at=appointment.reminder_sent_at,
+        doctor_full_name=appointment.doctor.user.full_name,
+        patient_name=appointment.patient.name,
+        patient_phone=appointment.patient.phone,
+    )
 
 
 # O webhook de WhatsApp saiu deste router para app/routers/webhooks.py, onde

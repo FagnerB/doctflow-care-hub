@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Copy, Loader2, Stethoscope } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Copy, Info, Loader2, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { WeeklySchedule, defaultWeeklyHours, type WeeklyHours } from "@/components/WeeklySchedule";
 import { useDoctorProfile, useUpdateDoctorProfile } from "@/hooks/use-doctor";
@@ -53,6 +54,11 @@ function SettingsPage() {
     setCancellationHours(String(profile.config_json.cancellation_policy_hours));
   }, [profile]);
 
+  // Em dev local o link real ainda não existe (o médico não vai divulgar
+  // "localhost"). Isso se resolve sozinho assim que o deploy do frontend
+  // (Lovable) publica num domínio de verdade — window.location.origin já
+  // reflete o host certo automaticamente, sem precisar mudar nada aqui.
+  const isLocalPreview = typeof window !== "undefined" && window.location.hostname === "localhost";
   const publicLink =
     typeof window !== "undefined" && profile ? `${window.location.origin}/d/${profile.slug}` : "";
 
@@ -127,19 +133,32 @@ function SettingsPage() {
 
         {/* Seu link */}
         <Section title="Seu link público">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary p-3">
-            <code className="flex-1 text-sm text-foreground truncate">{publicLink}</code>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                navigator.clipboard?.writeText(publicLink);
-                toast.success("Link copiado!");
-              }}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-          </div>
+          {isLocalPreview && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              Preview local — quando o site for publicado, o link abaixo já mostra o domínio real automaticamente.
+            </p>
+          )}
+          <TooltipProvider>
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary p-3">
+              <code className="flex-1 text-sm text-foreground truncate">{publicLink}</code>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(publicLink);
+                      toast.success("Link copiado!");
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copie este link e cole na bio do seu Instagram</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </Section>
 
         {/* Horários */}

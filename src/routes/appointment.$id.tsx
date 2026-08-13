@@ -5,9 +5,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarCheck, Loader2, MessageCircle, SearchX, Stethoscope } from "lucide-react";
+import { maskPhoneForPublic } from "@/lib/phone";
 import { toBrasiliaDisplayDate } from "@/lib/timezone";
 import { usePublicAppointmentStatus } from "@/hooks/use-appointments";
 import type { AppointmentStatus } from "@/lib/api-types";
+
+const ACTIVE_STATUSES: AppointmentStatus[] = ["pending", "confirmed"];
 
 // Página pública de status da consulta — o paciente não precisa de conta,
 // o próprio UUID do agendamento funciona como "token" de acesso ao link.
@@ -65,13 +68,21 @@ function AppointmentStatusPage() {
                 <div className="mx-auto h-14 w-14 rounded-full bg-primary/10 grid place-items-center mb-3">
                   <CalendarCheck className="h-7 w-7 text-primary" />
                 </div>
-                <h1 className="text-xl font-bold text-foreground">Sua consulta</h1>
+                <h1 className="text-xl font-bold text-foreground">Consulta com {statusQuery.data.doctor_full_name}</h1>
                 <Badge className={`${statusColor[statusQuery.data.status]} mt-2`}>
                   {statusLabels[statusQuery.data.status]}
                 </Badge>
               </div>
 
               <div className="mt-6 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Paciente</span>
+                  <span className="text-foreground font-medium">{statusQuery.data.patient_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Telefone</span>
+                  <span className="text-foreground font-medium">{maskPhoneForPublic(statusQuery.data.patient_phone)}</span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Data</span>
                   <span className="text-foreground font-medium">
@@ -92,12 +103,17 @@ function AppointmentStatusPage() {
                 </div>
               </div>
 
-              <div className="mt-6 flex items-start gap-2 rounded-lg bg-secondary p-3 text-sm text-foreground">
-                <MessageCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <span className="text-left">
-                  Para cancelar, responda <strong>CANCELAR</strong> na conversa do WhatsApp que você recebeu.
-                </span>
-              </div>
+              {/* Sem endpoint público de cancelamento por id no backend — o único
+                  caminho real é responder CANCELAR no WhatsApp. Só faz sentido
+                  mostrar esse aviso enquanto a consulta ainda está ativa. */}
+              {ACTIVE_STATUSES.includes(statusQuery.data.status) && (
+                <div className="mt-6 flex items-start gap-2 rounded-lg bg-secondary p-3 text-sm text-foreground">
+                  <MessageCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <span className="text-left">
+                    Para cancelar, responda <strong>CANCELAR</strong> na conversa do WhatsApp que você recebeu.
+                  </span>
+                </div>
+              )}
 
               <Link to="/" className="mt-6 block">
                 <Button variant="outline" className="w-full">Voltar ao início</Button>

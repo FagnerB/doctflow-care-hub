@@ -46,9 +46,15 @@ class AppointmentRead(BaseModel):
 
 
 class AppointmentPublicStatusResponse(BaseModel):
-    # Sem from_attributes o endpoint de status quebrava com 500 ao validar o
-    # objeto ORM vindo do banco.
-    model_config = ConfigDict(from_attributes=True)
+    """Status público da consulta — o id (UUID) funciona como token de acesso.
+
+    Inclui nome do médico e dados do paciente porque essa é a única tela que
+    o paciente vê depois de agendar; sem eles a página fica sem contexto
+    (`/appointment/{id}` não sabe dizer "consulta com quem" nem "de quem").
+    Seguro no mesmo modelo do restante do link: só quem tem o UUID (recebido
+    na confirmação) chega a essa informação, igual já vale para
+    confirmation_sent_at/reminder_sent_at.
+    """
 
     id: str
     status: AppointmentStatus
@@ -56,6 +62,9 @@ class AppointmentPublicStatusResponse(BaseModel):
     duration_minutes: int
     confirmation_sent_at: datetime | None = None
     reminder_sent_at: datetime | None = None
+    doctor_full_name: str
+    patient_name: str
+    patient_phone: str
 
 
 class AppointmentWebhookPayload(BaseModel):

@@ -198,6 +198,7 @@ function BookingPage() {
             <SuccessScreen
               slot={selectedSlot}
               appointment={createdAppointment}
+              doctorName={doctor.full_name}
               onClose={() => {
                 setModalOpen(false);
                 setStep("pick");
@@ -325,29 +326,69 @@ function BookingForm({
   );
 }
 
+// "2026-08-24T13:00:00Z" -> "20260824T130000Z", formato exigido pelo parâmetro
+// `dates` do link de criação de evento do Google Calendar.
+function toGoogleCalendarStamp(iso: string): string {
+  return new Date(iso).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+}
+
+function buildGoogleCalendarUrl(appointment: Appointment, doctorName: string): string {
+  const start = new Date(appointment.scheduled_at);
+  const end = new Date(start.getTime() + appointment.duration_minutes * 60_000);
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `Consulta com ${doctorName}`,
+    dates: `${toGoogleCalendarStamp(start.toISOString())}/${toGoogleCalendarStamp(end.toISOString())}`,
+    details: "Agendado pelo DoctFlow.",
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 function SuccessScreen({
   slot,
   appointment,
+  doctorName,
   onClose,
 }: {
   slot: AvailabilitySlot;
   appointment: Appointment;
+  doctorName: string;
   onClose: () => void;
 }) {
+  // Código curto só para referência visual — o id completo (UUID) é o que
+  // realmente identifica a consulta nos links e na API.
+  const shortCode = appointment.id.slice(0, 8).toUpperCase();
+  const patientPhone = appointment.patient?.phone;
+
   return (
     <div className="text-center py-4">
       <div className="mx-auto h-16 w-16 rounded-full bg-success/10 grid place-items-center mb-4">
         <CheckCircle2 className="h-9 w-9 text-success" />
       </div>
       <h2 className="text-xl font-bold text-foreground">Consulta confirmada! ✅</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-2 text-sm text-foreground font-medium">{doctorName}</p>
+      <p className="text-sm text-muted-foreground">
         {format(toBrasiliaDisplayDate(slot.start_time), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
       </p>
+      <p className="mt-1 text-xs text-muted-foreground">Código da consulta: #{shortCode}</p>
       <div className="mt-6 flex items-center gap-2 rounded-lg bg-secondary p-3 text-sm text-foreground">
         <MessageCircle className="h-5 w-5 text-primary shrink-0" />
-        <span className="text-left">Você receberá lembretes pelo WhatsApp.</span>
+        <span className="text-left">
+          Você receberá lembretes pelo WhatsApp{patientPhone ? ` em ${patientPhone}` : ""}.
+        </span>
       </div>
       <div className="mt-4 flex flex-col gap-2">
+        <a
+          href={buildGoogleCalendarUrl(appointment, doctorName)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full"
+        >
+          <Button variant="outline" className="w-full">
+            <CalendarPlus className="h-4 w-4 mr-1.5" />
+            Adicionar ao meu calendário
+          </Button>
+        </a>
         <Link to="/appointment/$id" params={{ id: appointment.id }} className="w-full">
           <Button variant="outline" className="w-full">
             Ver minha consulta

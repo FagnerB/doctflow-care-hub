@@ -175,8 +175,15 @@ class AppointmentService:
         result = await session.scalars(query.order_by(Appointment.scheduled_at.asc()))
         return list(result.all())
 
-    async def get_public_status(self, session: AsyncSession, appointment_id: str):
-        appointment = await session.get(Appointment, appointment_id)
+    async def get_public_status(self, session: AsyncSession, appointment_id: str) -> Appointment:
+        # selectinload em doctor.user e patient: a tela pública de status
+        # mostra nome do médico e do paciente, e acessar isso de forma lazy
+        # numa sessão async levantaria MissingGreenlet.
+        appointment = await session.scalar(
+            select(Appointment)
+            .options(selectinload(Appointment.doctor).selectinload(Doctor.user), selectinload(Appointment.patient))
+            .where(Appointment.id == appointment_id)
+        )
         if appointment is None:
             raise NotFoundError("Agendamento não encontrado")
         return appointment

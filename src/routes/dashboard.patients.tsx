@@ -14,6 +14,7 @@ import { Loader2, Search, User } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { EmptyState } from "@/components/EmptyState";
+import { formatPhone } from "@/lib/phone";
 import { toBrasiliaDisplayDate } from "@/lib/timezone";
 import { useDoctorAppointments } from "@/hooks/use-appointments";
 import type { Appointment, Patient } from "@/lib/api-types";
@@ -126,7 +127,7 @@ function PatientsPage() {
                 {filtered.map((p) => (
                   <TableRow key={p.patient.id} className="cursor-pointer" onClick={() => setSelected(p)}>
                     <TableCell className="font-medium text-foreground">{p.patient.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{p.patient.phone}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatPhone(p.patient.phone)}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {format(toBrasiliaDisplayDate(p.lastVisit), "dd/MM/yyyy")}
                     </TableCell>
@@ -147,7 +148,7 @@ function PatientsPage() {
             <>
               <SheetHeader>
                 <SheetTitle>{selected.patient.name}</SheetTitle>
-                <SheetDescription>{selected.patient.phone}</SheetDescription>
+                <SheetDescription>{formatPhone(selected.patient.phone)}</SheetDescription>
               </SheetHeader>
               <div className="mt-6 px-4">
                 <h3 className="text-sm font-semibold text-foreground mb-2">Histórico</h3>

@@ -180,6 +180,14 @@ export interface AppointmentCreatePayload {
   notes?: string | null;
 }
 
+export interface AppointmentCreateByDoctorPayload {
+  patient_name: string;
+  patient_phone: string;
+  patient_email?: string | null;
+  scheduled_at: string; // ISO
+  notes?: string | null;
+}
+
 export interface ResetPasswordPayload {
   new_password: string;
   access_token?: string;

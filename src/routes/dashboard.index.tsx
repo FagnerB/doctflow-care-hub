@@ -24,14 +24,15 @@ import {
 } from "@/components/ui/dialog";
 import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarOff, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
+import { CalendarOff, CalendarPlus, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
+import { NewAppointmentDialog } from "@/components/NewAppointmentDialog";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/api-client";
 import { toBrasiliaDisplayDate } from "@/lib/timezone";
 import { useDoctorAppointments, useUpdateAppointmentStatus } from "@/hooks/use-appointments";
-import { useDoctorStats } from "@/hooks/use-doctor";
+import { useDoctorProfile, useDoctorStats } from "@/hooks/use-doctor";
 import { useCreateException, useExceptions } from "@/hooks/use-exceptions";
 import { markAppointmentsAsSeen } from "@/hooks/use-unseen-appointments";
 import type { Appointment, AppointmentStatus } from "@/lib/api-types";
@@ -64,12 +65,14 @@ function AgendaPage() {
   const appointmentsQuery = useDoctorAppointments();
   const statsQuery = useDoctorStats();
   const exceptionsQuery = useExceptions();
+  const profileQuery = useDoctorProfile();
   const updateStatus = useUpdateAppointmentStatus();
   const createException = useCreateException();
 
   const [date, setDate] = useState<Date>(new Date());
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [confirmBlock, setConfirmBlock] = useState(false);
+  const [newAppointmentOpen, setNewAppointmentOpen] = useState(false);
 
   const appointments = useMemo(() => appointmentsQuery.data ?? [], [appointmentsQuery.data]);
   const exceptions = useMemo(() => exceptionsQuery.data ?? [], [exceptionsQuery.data]);
@@ -135,10 +138,16 @@ function AgendaPage() {
             {format(date, "EEEE, dd 'de' MMMM", { locale: ptBR })}
           </p>
         </div>
-        <Button variant="outline" disabled={isDayFullyBlocked} onClick={() => setConfirmBlock(true)}>
-          <CalendarOff className="h-4 w-4 mr-1.5" />
-          {isDayFullyBlocked ? "Dia já bloqueado" : "Bloquear dia"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={isDayFullyBlocked} onClick={() => setConfirmBlock(true)}>
+            <CalendarOff className="h-4 w-4 mr-1.5" />
+            {isDayFullyBlocked ? "Dia já bloqueado" : "Bloquear dia"}
+          </Button>
+          <Button disabled={!profileQuery.data} onClick={() => setNewAppointmentOpen(true)}>
+            <CalendarPlus className="h-4 w-4 mr-1.5" />
+            Novo agendamento
+          </Button>
+        </div>
       </div>
 
       {/* Cards de estatísticas do mês */}
@@ -284,6 +293,16 @@ function AgendaPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Novo agendamento manual */}
+      {profileQuery.data && (
+        <NewAppointmentDialog
+          open={newAppointmentOpen}
+          onOpenChange={setNewAppointmentOpen}
+          doctor={profileQuery.data}
+          defaultDate={date}
+        />
+      )}
 
       {/* Confirmação de bloqueio de dia */}
       <AlertDialog open={confirmBlock} onOpenChange={setConfirmBlock}>

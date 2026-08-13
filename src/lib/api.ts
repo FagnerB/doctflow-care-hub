@@ -4,6 +4,7 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "./api-client";
 import type {
   Appointment,
+  AppointmentCreateByDoctorPayload,
   AppointmentCreatePayload,
   AppointmentPublicStatus,
   AppointmentStatus,
@@ -44,6 +45,9 @@ export const doctorsApi = {
 
   getMyAppointments: (params?: { date_from?: string; date_to?: string; status?: AppointmentStatus }) =>
     apiGet<Appointment[]>("/api/doctors/me/appointments", params),
+
+  createMyAppointment: (payload: AppointmentCreateByDoctorPayload) =>
+    apiPost<Appointment>("/api/doctors/me/appointments", payload),
 
   getMyStats: (referenceMonth?: string) =>
     apiGet<DoctorStats>("/api/doctors/me/stats", { reference_month: referenceMonth }),

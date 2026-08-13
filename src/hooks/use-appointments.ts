@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { doctorsApi, appointmentsApi } from "@/lib/api";
 import { hasAccessToken, isBrowser } from "@/lib/auth-storage";
-import type { AppointmentCreatePayload, AppointmentStatus } from "@/lib/api-types";
+import type { AppointmentCreateByDoctorPayload, AppointmentCreatePayload, AppointmentStatus } from "@/lib/api-types";
 import { doctorKeys } from "./use-doctor";
 
 export const appointmentKeys = {
@@ -23,6 +23,17 @@ export function useDoctorAppointments(options?: { refetchInterval?: number }) {
     queryFn: () => doctorsApi.getMyAppointments(),
     enabled: isBrowser() && hasAccessToken(),
     refetchInterval: options?.refetchInterval,
+  });
+}
+
+export function useCreateDoctorAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: AppointmentCreateByDoctorPayload) => doctorsApi.createMyAppointment(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.mine });
+      queryClient.invalidateQueries({ queryKey: doctorKeys.stats() });
+    },
   });
 }
 

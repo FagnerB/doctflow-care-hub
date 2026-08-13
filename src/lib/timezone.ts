@@ -21,3 +21,17 @@ export function toBrasiliaDisplayDate(iso: string): Date {
   const [, year, month, day, hour, minute, second] = match.map(Number);
   return new Date(year, month - 1, day, hour, minute, second);
 }
+
+/**
+ * Constrói um ISO com offset fixo de Brasília (-03:00) a partir de uma data
+ * (só os campos de calendário são usados) e um horário "HH:mm" digitado
+ * livremente — caso do agendamento manual, onde o horário não vem pronto de
+ * um slot da API. Offset fixo é seguro aqui: o Brasil não usa mais horário de
+ * verão desde 2019, então America/Sao_Paulo é sempre UTC-3.
+ */
+export function buildBrasiliaIso(date: Date, timeStr: string): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${timeStr}:00-03:00`;
+}

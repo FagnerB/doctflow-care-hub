@@ -23,6 +23,27 @@ class AppointmentCreatePublic(BaseModel):
         return normalize_br_phone(value)
 
 
+class AppointmentCreateByDoctor(BaseModel):
+    """Agendamento manual feito pelo próprio médico (telefone, balcão, encaixe).
+
+    Diferente de AppointmentCreatePublic: não valida contra o expediente
+    configurado nem a janela de antecedência — o profissional pode encaixar
+    fora do horário normal. Só o conflito real de horário é bloqueado (mesma
+    constraint única do banco usada no fluxo público).
+    """
+
+    patient_name: str = Field(min_length=2, max_length=255)
+    patient_phone: str = Field(min_length=10, max_length=20)
+    patient_email: str | None = None
+    scheduled_at: datetime
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("patient_phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        return normalize_br_phone(value)
+
+
 class AppointmentStatusUpdate(BaseModel):
     status: AppointmentStatus
     notes: str | None = Field(default=None, max_length=2000)

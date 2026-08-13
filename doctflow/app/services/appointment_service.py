@@ -16,7 +16,7 @@ from app.models.common import AppointmentStatus, NotificationStatus, Notificatio
 from app.models.doctor import Doctor
 from app.models.notification_log import NotificationLog
 from app.models.patient import Patient
-from app.schemas.appointment import AppointmentCreatePublic, AppointmentStatusUpdate
+from app.schemas.appointment import AppointmentCreateByDoctor, AppointmentCreatePublic, AppointmentStatusUpdate
 from app.schemas.doctor import DoctorConfig
 from app.schemas.patient import PatientCreate
 from app.schemas.schedule import DoctorStatsResponse, UpcomingAppointmentSummary
@@ -140,6 +140,47 @@ class AppointmentService:
             # a checagem de slots acima sofre corrida entre requisições.
             await session.rollback()
             raise ConflictError("Horário indisponível") from exc
+
+        return appointment
+
+    async def create_doctor_appointment(
+        self, session: AsyncSession, doctor: Doctor, payload: AppointmentCreateByDoctor
+    ) -> Appointment:
+        """Agendamento manual pelo médico — telefone, balcão, encaixe.
+
+        Propositalmente NÃO valida contra `working_hours` nem contra a janela
+        de antecedência (`validate_booking_window`): o profissional sabe
+        quando pode encaixar um paciente, o sistema não deveria proibir. A
+        única coisa que continua bloqueada é conflito real de horário — pela
+        mesma constraint única do banco usada em create_public_appointment.
+        """
+        doctor_config = DoctorConfig.model_validate(doctor.config_json or {})
+        scheduled_at_utc = desired_datetime_to_utc(payload.scheduled_at)
+
+        patient = await self.get_or_create_patient(
+            session,
+            PatientCreate(
+                name=payload.patient_name,
+                phone=payload.patient_phone,
+                email=payload.patient_email,
+                cpf=None,
+            ),
+        )
+
+        appointment = Appointment(
+            doctor_id=doctor.id,
+            patient_id=patient.id,
+            scheduled_at=scheduled_at_utc,
+            duration_minutes=doctor_config.consultation_duration_minutes,
+            status=AppointmentStatus.confirmed,
+            notes=payload.notes,
+        )
+        session.add(appointment)
+        try:
+            await session.flush()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise ConflictError("Já existe uma consulta ativa nesse horário") from exc
 
         return appointment
 

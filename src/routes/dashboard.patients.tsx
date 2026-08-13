@@ -16,8 +16,7 @@ import { ptBR } from "date-fns/locale";
 import { EmptyState } from "@/components/EmptyState";
 import { formatPhone } from "@/lib/phone";
 import { toBrasiliaDisplayDate } from "@/lib/timezone";
-import { useDoctorAppointments } from "@/hooks/use-appointments";
-import type { Appointment, Patient } from "@/lib/api-types";
+import { filterPatients, usePatients, type PatientSummary } from "@/hooks/use-patients";
 
 export const Route = createFileRoute("/dashboard/patients")({
   component: PatientsPage,
@@ -32,56 +31,12 @@ const statusLabels: Record<string, string> = {
   no_show: "Não compareceu",
 };
 
-interface PatientSummary {
-  patient: Patient;
-  lastVisit: string;
-  totalVisits: number;
-}
-
-// O backend não tem um endpoint "listar pacientes" — só GET /patients/{id}
-// (por id específico). Como cada consulta já vem com o paciente embutido
-// (AppointmentRead.patient), derivamos a lista aqui: é exatamente o mesmo
-// conjunto de pacientes que um endpoint dedicado devolveria, sem precisar de
-// uma rota nova no backend.
-function derivePatients(appointments: Appointment[]): PatientSummary[] {
-  const byId = new Map<string, PatientSummary>();
-  for (const appointment of appointments) {
-    if (!appointment.patient) continue;
-    const existing = byId.get(appointment.patient.id);
-    if (!existing) {
-      byId.set(appointment.patient.id, {
-        patient: appointment.patient,
-        lastVisit: appointment.scheduled_at,
-        totalVisits: 1,
-      });
-    } else {
-      existing.totalVisits += 1;
-      if (new Date(appointment.scheduled_at) > new Date(existing.lastVisit)) {
-        existing.lastVisit = appointment.scheduled_at;
-      }
-    }
-  }
-  return Array.from(byId.values()).sort((a, b) => +new Date(b.lastVisit) - +new Date(a.lastVisit));
-}
-
 function PatientsPage() {
-  const appointmentsQuery = useDoctorAppointments();
+  const { patients, appointments, isLoading } = usePatients();
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PatientSummary | null>(null);
 
-  const appointments = useMemo(() => appointmentsQuery.data ?? [], [appointmentsQuery.data]);
-  const patients = useMemo(() => derivePatients(appointments), [appointments]);
-
-  const filtered = useMemo(() => {
-    const term = q.toLowerCase().trim();
-    if (!term) return patients;
-    const digits = term.replace(/\D/g, "");
-    return patients.filter(
-      (p) =>
-        p.patient.name.toLowerCase().includes(term) ||
-        (digits && p.patient.phone.replace(/\D/g, "").includes(digits)),
-    );
-  }, [q, patients]);
+  const filtered = useMemo(() => filterPatients(patients, q), [q, patients]);
 
   const historyOf = (patientId: string) =>
     appointments
@@ -92,7 +47,7 @@ function PatientsPage() {
     <div className="p-4 md:p-6">
       <h1 className="text-2xl font-bold text-foreground">Pacientes</h1>
       <p className="text-sm text-muted-foreground">
-        {appointmentsQuery.isLoading ? "Carregando..." : `${patients.length} pacientes cadastrados`}
+        {isLoading ? "Carregando..." : `${patients.length} pacientes cadastrados`}
       </p>
 
       <div className="mt-4 relative max-w-md">
@@ -106,7 +61,7 @@ function PatientsPage() {
       </div>
 
       <div className="mt-4 bg-background border border-border rounded-xl overflow-hidden">
-        {appointmentsQuery.isLoading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>

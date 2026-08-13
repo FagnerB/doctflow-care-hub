@@ -22,6 +22,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key")
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
 import app.models  # noqa: F401,E402  (garante o registro de todas as tabelas)
@@ -50,6 +51,18 @@ async def engine(tmp_path: Path):
     test_engine = create_async_engine(url)
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migration 0002 cria esse índice só em Postgres (é SQL bruto, não
+        # declarado nos models — Base.metadata.create_all não sabe dele).
+        # SQLite suporta índice único parcial desde 3.8.0, então recriamos
+        # aqui pra o teste exercitar a mesma proteção real de produção contra
+        # dois agendamentos ativos no mesmo doctor_id + scheduled_at.
+        await conn.execute(
+            text(
+                "CREATE UNIQUE INDEX uq_appointments_active_slot "
+                "ON appointments (doctor_id, scheduled_at) "
+                "WHERE status IN ('pending', 'confirmed')"
+            )
+        )
     yield test_engine
     await test_engine.dispose()
 

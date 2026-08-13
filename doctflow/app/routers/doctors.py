@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
@@ -14,7 +15,7 @@ from app.models.common import AppointmentStatus
 from app.models.doctor import Doctor
 from app.models.schedule import ScheduleException
 from app.models.user import User
-from app.schemas.appointment import AppointmentRead, AppointmentStatusUpdate
+from app.schemas.appointment import AppointmentCreateByDoctor, AppointmentRead, AppointmentStatusUpdate
 from app.schemas.doctor import DoctorPublic, DoctorRead, DoctorUpdate
 from app.schemas.schedule import (
     AvailabilityResponse,
@@ -23,6 +24,8 @@ from app.schemas.schedule import (
     ScheduleExceptionRead,
 )
 from app.services.appointment_service import appointment_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
 
@@ -89,6 +92,41 @@ async def list_my_appointments(
 ) -> list[AppointmentRead]:
     items = await appointment_service.list_doctor_appointments(session, current_doctor.id, date_from=date_from, date_to=date_to, status=status)
     return [AppointmentRead.model_validate(appointment) for appointment in items]
+
+
+@router.post("/me/appointments", response_model=AppointmentRead, status_code=201)
+async def create_my_appointment(
+    payload: AppointmentCreateByDoctor,
+    current_doctor: Doctor = Depends(get_current_doctor),
+    session: AsyncSession = Depends(get_db_session),
+) -> AppointmentRead:
+    """Agendamento manual pelo médico — telefone, balcão, encaixe fora do expediente.
+
+    O paciente é criado automaticamente se o telefone informado não existir
+    ainda (mesma lógica do agendamento público). Dispara a mesma notificação
+    de confirmação do fluxo público, pra manter o comportamento consistente
+    entre os dois canais.
+    """
+    appointment = await appointment_service.create_doctor_appointment(session, current_doctor, payload)
+    await session.commit()
+
+    appointment = await session.scalar(
+        select(Appointment)
+        .options(selectinload(Appointment.patient), selectinload(Appointment.doctor).selectinload(Doctor.user))
+        .where(Appointment.id == appointment.id)
+    )
+
+    try:
+        await appointment_service.send_confirmation_notifications(session, appointment)
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        logger.exception("confirmation_notification_failed", extra={"appointment_id": appointment.id})
+        appointment = await session.scalar(
+            select(Appointment).options(selectinload(Appointment.patient)).where(Appointment.id == appointment.id)
+        )
+
+    return AppointmentRead.model_validate(appointment)
 
 
 @router.put("/me/appointments/{appointment_id}/status", response_model=AppointmentRead)

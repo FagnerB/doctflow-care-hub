@@ -108,17 +108,18 @@ function Landing() {
         </div>
       </section>
 
-      {/* Depoimento */}
+      {/* Fase beta — nada de depoimento ou número inventado aqui */}
       <section className="py-16 md:py-20">
         <div className="mx-auto max-w-3xl px-4 text-center">
-          <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 grid place-items-center text-2xl mb-6">
-            👩‍⚕️
+          <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 grid place-items-center mb-6">
+            <Sparkles className="h-7 w-7 text-primary" />
           </div>
-          <blockquote className="text-2xl md:text-3xl font-medium text-foreground leading-snug">
-            “Reduzi <span className="text-primary">60% das faltas</span> com lembretes automáticos.”
-          </blockquote>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Dra. Ana Ribeiro — Dentista, São Paulo
+          <h2 className="text-2xl md:text-3xl font-medium text-foreground leading-snug">
+            Estamos em fase beta
+          </h2>
+          <p className="mt-4 text-muted-foreground max-w-xl mx-auto">
+            O DoctFlow está sendo construído junto com os primeiros profissionais que topam testar.
+            Ainda não temos números de resultado pra mostrar — preferimos isso a inventar um.
           </p>
         </div>
       </section>

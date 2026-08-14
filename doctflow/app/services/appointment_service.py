@@ -316,12 +316,19 @@ class AppointmentService:
         notification_type: NotificationType,
         ok: bool,
         error_message: str | None,
+        simulated: bool = False,
     ) -> None:
+        if simulated:
+            status = NotificationStatus.simulated
+        elif ok:
+            status = NotificationStatus.sent
+        else:
+            status = NotificationStatus.failed
         session.add(
             NotificationLog(
                 appointment_id=appointment_id,
                 type=notification_type,
-                status=NotificationStatus.sent if ok else NotificationStatus.failed,
+                status=status,
                 error_message=error_message,
             )
         )
@@ -343,9 +350,18 @@ class AppointmentService:
         patient_result = await self.notifications.send_whatsapp(patient.phone, patient_message)
         doctor_result = await self.notifications.send_whatsapp(doctor.user.phone, doctor_message)
 
-        if patient_result.ok:
+        # Só marca como enviada quando realmente saiu -- em modo mock nada
+        # chega ao paciente, então confirmation_sent_at fica None de propósito.
+        if patient_result.ok and not patient_result.simulated:
             appointment.confirmation_sent_at = datetime.now(timezone.utc)
-        self._log(session, appointment.id, NotificationType.confirmation, patient_result.ok, patient_result.error_message)
+        self._log(
+            session,
+            appointment.id,
+            NotificationType.confirmation,
+            patient_result.ok,
+            patient_result.error_message,
+            simulated=patient_result.simulated,
+        )
 
         if not doctor_result.ok:
             self._log(
@@ -380,6 +396,7 @@ class AppointmentService:
             NotificationType.cancellation,
             patient_result.ok,
             patient_result.error_message,
+            simulated=patient_result.simulated,
         )
         if not doctor_result.ok:
             self._log(
@@ -421,14 +438,16 @@ class AppointmentService:
             )
 
             for appointment in result.all():
-                already_sent = await session.scalar(
+                # "sent" ou "simulated" contam pra dedupe -- o que evita reprocessar
+                # é ter tentado, não ter sido entregue de verdade.
+                already_processed = await session.scalar(
                     select(NotificationLog.id).where(
                         NotificationLog.appointment_id == appointment.id,
                         NotificationLog.type == notification_type,
-                        NotificationLog.status == NotificationStatus.sent,
+                        NotificationLog.status.in_({NotificationStatus.sent, NotificationStatus.simulated}),
                     )
                 )
-                if already_sent is not None:
+                if already_processed is not None:
                     continue
 
                 patient = appointment.patient
@@ -442,10 +461,13 @@ class AppointmentService:
                     patient.name, doctor.user.full_name, appointment.scheduled_at, hours_ahead
                 )
                 delivery = await self.notifications.send_whatsapp(patient.phone, message)
-                self._log(session, appointment.id, notification_type, delivery.ok, delivery.error_message)
+                self._log(
+                    session, appointment.id, notification_type, delivery.ok, delivery.error_message, simulated=delivery.simulated
+                )
 
                 if delivery.ok:
-                    appointment.reminder_sent_at = datetime.now(timezone.utc)
+                    if not delivery.simulated:
+                        appointment.reminder_sent_at = datetime.now(timezone.utc)
                     sent += 1
                 else:
                     failed += 1

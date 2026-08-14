@@ -39,6 +39,9 @@ def format_local_datetime(value: datetime) -> str:
 class DeliveryResult:
     ok: bool
     provider: str
+    # True quando caiu no mock (_mock_send): nada foi entregue de verdade,
+    # só logado. `ok=True` nesse caso significa apenas "não travou o fluxo".
+    simulated: bool = False
     error_message: str | None = None
 
 
@@ -78,7 +81,7 @@ class NotificationService:
             # LogRecord.message) — usar esse nome em `extra` sempre lança KeyError.
             extra={"phone": phone, "whatsapp_message": message, "provider": "console", "reason": reason},
         )
-        return DeliveryResult(ok=True, provider="console")
+        return DeliveryResult(ok=True, provider="console", simulated=True)
 
     async def _send_via_http_api(self, phone: str, message: str) -> DeliveryResult:
         payload = {"to": phone, "message": message}

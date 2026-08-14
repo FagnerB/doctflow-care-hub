@@ -35,6 +35,8 @@ class NotificationStatus(StrEnum):
     sent = "sent"
     delivered = "delivered"
     failed = "failed"
+    # Provider em modo mock (console): nada saiu de verdade, só foi logado.
+    simulated = "simulated"
 
 
 DAYS_OF_WEEK = (

@@ -54,12 +54,13 @@ async def test_agendamento_publico_confirma_e_registra_notificacao(client, docto
     assert body["status"] == "confirmed"
     assert body["duration_minutes"] == 30
     assert body["patient"]["phone"] == "+5511912345678"
-    assert body["confirmation_sent_at"] is not None
+    # Modo mock (provider console nos testes): nada foi entregue de verdade,
+    # então confirmation_sent_at continua None -- não pode mentir pro paciente.
+    assert body["confirmation_sent_at"] is None
 
-    # A confirmação (modo mock) precisa ficar registrada em notification_logs.
     logs = (await session.scalars(select(NotificationLog))).all()
     assert [log.type.value for log in logs] == ["confirmation"]
-    assert logs[0].status.value == "sent"
+    assert logs[0].status.value == "simulated"
 
 
 async def test_slot_some_da_disponibilidade_apos_agendar(client, doctor) -> None:

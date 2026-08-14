@@ -100,15 +100,21 @@ async def test_ignora_consulta_cancelada(session, doctor) -> None:
     assert sent == 0
 
 
-async def test_marca_reminder_sent_at(session, doctor) -> None:
+async def test_reminder_sent_at_fica_nulo_em_modo_mock(session, doctor) -> None:
+    """Provider console (mock) não entrega nada de verdade -- reminder_sent_at
+    só pode ser preenchido quando o envio for real, senão mente pro paciente."""
     appointment = await _criar_consulta(session, doctor, horas_a_frente=2.2)
     assert appointment.reminder_sent_at is None
 
-    await appointment_service.run_reminders(session)
+    sent, _ = await appointment_service.run_reminders(session)
     await session.commit()
     await session.refresh(appointment)
 
-    assert appointment.reminder_sent_at is not None
+    assert sent == 1
+    assert appointment.reminder_sent_at is None
+
+    logs = (await session.scalars(select(NotificationLog))).all()
+    assert logs[0].status.value == "simulated"
 
 
 async def test_janela_cobre_o_intervalo_do_scheduler() -> None:

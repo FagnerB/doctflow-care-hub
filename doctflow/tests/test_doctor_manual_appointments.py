@@ -122,10 +122,12 @@ async def test_agendamento_manual_registra_notificacao_de_confirmacao(client, se
         headers=auth(doctor_token),
     )
     assert response.status_code == 201
-    assert response.json()["confirmation_sent_at"] is not None
+    # Modo mock: registra a tentativa, mas não finge ter entregue de verdade.
+    assert response.json()["confirmation_sent_at"] is None
 
     logs = (await session.scalars(select(NotificationLog))).all()
     assert [log.type.value for log in logs] == ["confirmation"]
+    assert logs[0].status.value == "simulated"
 
 
 async def test_agendamento_manual_com_notify_patient_falso_nao_notifica(client, session, doctor, doctor_token) -> None:

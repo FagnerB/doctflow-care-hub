@@ -15,7 +15,9 @@ from sqlalchemy import text
 from app.config import settings
 from app.database import engine
 from app.exceptions import AppError
-from app.routers import admin, appointments, auth, doctors, patients, schedules, tasks, webhooks
+from app.routers import admin, appointments, auth, doctors, patients, schedules, tasks
+
+# webhooks: import comentado junto com o router abaixo -- ver motivo lá.
 from app.tasks.reminder_jobs import ReminderScheduler
 
 
@@ -78,7 +80,13 @@ app.include_router(patients.router, prefix=settings.api_prefix)
 app.include_router(appointments.router, prefix=settings.api_prefix)
 app.include_router(schedules.router, prefix=settings.api_prefix)
 app.include_router(admin.router, prefix=settings.api_prefix)
-app.include_router(webhooks.router, prefix=settings.api_prefix)
+# Desligado por enquanto: cancel_by_phone (chamado por este webhook) identifica
+# o paciente só pelo telefone, sem checar doctor_id -- com dois médicos
+# compartilhando o mesmo paciente, pode cancelar a consulta do médico errado.
+# O WhatsApp real ainda não está integrado (provider = mock), então a rota não
+# serve ninguém hoje. Religar só depois do escopo por médico (doctor_id em
+# patients) estar resolvido.
+# app.include_router(webhooks.router, prefix=settings.api_prefix)
 app.include_router(tasks.router, prefix=settings.api_prefix)
 
 

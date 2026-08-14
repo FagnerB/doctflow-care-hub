@@ -18,6 +18,11 @@ from app.routers.webhooks import is_cancel_request
 
 LOCAL_TZ = ZoneInfo(settings.timezone)
 
+# Router desligado em app/main.py: cancel_by_phone identifica o paciente só
+# pelo telefone, sem checar doctor_id, e pode cancelar a consulta do médico
+# errado. Religar estes testes junto com o router quando isso for resolvido.
+pytestmark = pytest.mark.skip(reason="webhooks.router desligado -- ver app/main.py")
+
 
 def slot_futuro(dias: int = 5, hora: int = 9) -> datetime:
     alvo = (datetime.now(LOCAL_TZ) + timedelta(days=dias)).date()

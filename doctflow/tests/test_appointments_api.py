@@ -63,6 +63,45 @@ async def test_agendamento_publico_confirma_e_registra_notificacao(client, docto
     assert logs[0].status.value == "simulated"
 
 
+async def test_agendamento_publico_com_email_tenta_confirmar_por_email_tambem(client, doctor, session) -> None:
+    quando = proximo_slot()
+    response = await client.post(
+        "/api/appointments",
+        json={
+            "doctor_slug": "dr-silva",
+            "patient_name": "Carlos Souza",
+            "patient_phone": "(11) 91234-5678",
+            "patient_email": "carlos@example.com",
+            "desired_datetime": quando.isoformat(),
+        },
+    )
+    assert response.status_code == 201, response.text
+    # Email é opcional -- continua mock nos testes, então não finge ter entregue.
+    assert response.json()["confirmation_sent_at"] is None
+
+    logs = (await session.scalars(select(NotificationLog))).all()
+    assert [log.type.value for log in logs] == ["confirmation", "confirmation"]
+    assert [log.status.value for log in logs] == ["simulated", "simulated"]
+
+
+async def test_agendamento_publico_sem_email_nao_tenta_email(client, doctor, session) -> None:
+    """Sem email informado, o único log é o do WhatsApp -- não inventa tentativa."""
+    quando = proximo_slot()
+    response = await client.post(
+        "/api/appointments",
+        json={
+            "doctor_slug": "dr-silva",
+            "patient_name": "Carlos Souza",
+            "patient_phone": "(11) 91234-5678",
+            "desired_datetime": quando.isoformat(),
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    logs = (await session.scalars(select(NotificationLog))).all()
+    assert len(logs) == 1
+
+
 async def test_slot_some_da_disponibilidade_apos_agendar(client, doctor) -> None:
     quando = proximo_slot()
     await client.post(

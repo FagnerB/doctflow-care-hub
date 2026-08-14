@@ -63,6 +63,20 @@ class Settings(BaseSettings):
     # Se vazia, cai para a URL vista pelo request (pode falhar atrás de proxy).
     twilio_webhook_url: str = ""
 
+    # Email transacional de conteúdo livre (confirmação/cancelamento de consulta).
+    # Diferente do supabase_url acima, que só cobre os fluxos fixos de Auth.
+    # console (padrão) = modo mock, só loga. smtp = envia de verdade.
+    mail_provider: str = "console"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    mail_from_email: str = ""
+    # Nome de exibição padrão; o email de confirmação de consulta usa o nome
+    # do médico em vez disso (o paciente precisa reconhecer quem está avisando).
+    mail_from_name: str = "DoctFlow"
+    mail_reply_to: str = ""
+
     # Caminho no frontend onde o médico define a nova senha (link do e-mail).
     password_reset_path: str = "/reset-password"
     # Segredo do endpoint de cron dos lembretes (header X-Cron-Secret).

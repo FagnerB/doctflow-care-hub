@@ -20,6 +20,7 @@ from app.schemas.appointment import AppointmentCreateByDoctor, AppointmentCreate
 from app.schemas.doctor import DoctorConfig
 from app.schemas.patient import PatientCreate
 from app.schemas.schedule import DoctorStatsResponse, UpcomingAppointmentSummary
+from app.services.mail_service import mail_service
 from app.services.notification_service import NotificationService
 from app.services.schedule_service import (
     desired_datetime_to_local,
@@ -271,6 +272,21 @@ class AppointmentService:
         limite = scheduled_at - timedelta(hours=config.cancellation_policy_hours)
         return datetime.now(timezone.utc) <= limite
 
+    async def _cancel_active_appointment(
+        self, session: AsyncSession, appointment: Appointment, doctor: Doctor
+    ) -> Appointment:
+        if appointment.status not in ACTIVE_STATUSES:
+            raise NotFoundError("Nenhuma consulta ativa encontrada para cancelamento")
+        if not self._cancellation_deadline_ok(doctor, appointment):
+            config = DoctorConfig.model_validate(doctor.config_json or {})
+            raise ForbiddenError(
+                f"O cancelamento pelo paciente só é permitido até {config.cancellation_policy_hours}h "
+                "antes da consulta. Entre em contato com o consultório."
+            )
+        appointment.status = AppointmentStatus.cancelled_by_patient
+        await session.flush()
+        return appointment
+
     async def cancel_by_phone(self, session: AsyncSession, phone: str) -> Appointment:
         """Cancela a próxima consulta ativa do paciente identificado pelo telefone."""
         patient = await self.get_patient_by_phone(session, phone)
@@ -294,16 +310,25 @@ class AppointmentService:
         if doctor is None:
             raise NotFoundError("Médico do agendamento não encontrado")
 
-        if not self._cancellation_deadline_ok(doctor, appointment):
-            config = DoctorConfig.model_validate(doctor.config_json or {})
-            raise ForbiddenError(
-                f"O cancelamento pelo paciente só é permitido até {config.cancellation_policy_hours}h "
-                "antes da consulta. Entre em contato com o consultório."
-            )
+        return await self._cancel_active_appointment(session, appointment, doctor)
 
-        appointment.status = AppointmentStatus.cancelled_by_patient
-        await session.flush()
-        return appointment
+    async def cancel_by_id(self, session: AsyncSession, appointment_id: str) -> Appointment:
+        """Cancelamento público pelo link da tela de status.
+
+        O UUID do agendamento funciona como token de acesso -- mesmo padrão já
+        usado em get_public_status. Servia antes só via responder CANCELAR no
+        WhatsApp; esse canal está desligado (ver app/main.py), então esse é
+        hoje o único jeito do paciente cancelar sem ligar pro consultório.
+        """
+        appointment = await session.get(Appointment, appointment_id)
+        if appointment is None:
+            raise NotFoundError("Agendamento não encontrado")
+
+        doctor = await self._load_doctor_with_user(session, appointment.doctor_id)
+        if doctor is None:
+            raise NotFoundError("Médico do agendamento não encontrado")
+
+        return await self._cancel_active_appointment(session, appointment, doctor)
 
     # ------------------------------------------------------------------
     # Notificações
@@ -350,10 +375,11 @@ class AppointmentService:
         patient_result = await self.notifications.send_whatsapp(patient.phone, patient_message)
         doctor_result = await self.notifications.send_whatsapp(doctor.user.phone, doctor_message)
 
-        # Só marca como enviada quando realmente saiu -- em modo mock nada
-        # chega ao paciente, então confirmation_sent_at fica None de propósito.
-        if patient_result.ok and not patient_result.simulated:
-            appointment.confirmation_sent_at = datetime.now(timezone.utc)
+        # confirmation_sent_at só é preenchido se ALGUM canal realmente saiu --
+        # em modo mock nada chega ao paciente, e mentir sobre isso foi o
+        # problema original (N1).
+        really_notified = patient_result.ok and not patient_result.simulated
+
         self._log(
             session,
             appointment.id,
@@ -371,6 +397,35 @@ class AppointmentService:
                 False,
                 f"Aviso ao médico falhou: {doctor_result.error_message}",
             )
+
+        # Email é opcional no agendamento -- só tenta se o paciente informou.
+        if patient.email:
+            cancel_url = f"{settings.frontend_url.rstrip('/')}/appointment/{appointment.id}"
+            subject, body = mail_service.build_confirmation_email(
+                patient.name, doctor.user.full_name, appointment.scheduled_at, cancel_url
+            )
+            email_result = await mail_service.send(
+                patient.email,
+                subject,
+                body,
+                from_name=f"Dr(a). {doctor.user.full_name}",
+                reply_to=doctor.user.email,
+            )
+            if email_result.ok and not email_result.simulated:
+                really_notified = True
+            self._log(
+                session,
+                appointment.id,
+                NotificationType.confirmation,
+                email_result.ok,
+                f"Email: {email_result.error_message}" if email_result.error_message else None,
+                simulated=email_result.simulated,
+            )
+        else:
+            logger.info("confirmation_email_skipped_no_email", extra={"appointment_id": appointment.id})
+
+        if really_notified:
+            appointment.confirmation_sent_at = datetime.now(timezone.utc)
 
         await session.flush()
 

@@ -20,6 +20,17 @@ export function formatPhone(phone: string): string {
   return phone;
 }
 
+/**
+ * true se o telefone é celular (BR: sempre 9 dígitos locais, começando com
+ * "9" logo após o DDD). Fixo tem 8 dígitos locais e não recebe WhatsApp —
+ * usar para decidir se um botão de WhatsApp deve aparecer.
+ */
+export function isMobilePhone(phone: string): boolean {
+  const digits = phone.replace(/\D/g, "");
+  const local = digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
+  return local.length === 11 && local[2] === "9";
+}
+
 /** Mascara os últimos dígitos, para exibir em telas públicas sem expor o número inteiro. */
 export function maskPhoneForPublic(phone: string): string {
   const formatted = formatPhone(phone);

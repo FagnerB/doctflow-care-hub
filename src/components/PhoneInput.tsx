@@ -3,19 +3,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-// Aplica máscara (99) 99999-9999
+// Aplica máscara (99) 99999-9999 (celular) ou (99) 9999-9999 (fixo).
+// Celular sempre começa com 9 logo depois do DDD — é o único jeito de saber
+// qual dos dois formatos usar enquanto a pessoa ainda está digitando.
 function maskPhone(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-  const p1 = digits.slice(0, 2);
-  const p2 = digits.slice(2, 7);
-  const p3 = digits.slice(7, 11);
-  if (digits.length <= 2) return p1 ? `(${p1}` : "";
-  if (digits.length <= 7) return `(${p1}) ${p2}`;
-  return `(${p1}) ${p2}-${p3}`;
+  const raw = value.replace(/\D/g, "");
+  const ddd = raw.slice(0, 2);
+  const isMobile = raw[2] === "9";
+  const maxTotal = isMobile ? 11 : 10;
+  const digits = raw.slice(0, maxTotal);
+  const local = digits.slice(2);
+  const splitAt = isMobile ? 5 : 4;
+
+  if (digits.length <= 2) return ddd ? `(${ddd}` : "";
+  if (local.length <= splitAt) return `(${ddd}) ${local}`;
+  return `(${ddd}) ${local.slice(0, splitAt)}-${local.slice(splitAt)}`;
 }
 
 export function isValidPhone(value: string) {
-  return value.replace(/\D/g, "").length === 11;
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 10 || digits.length === 11;
 }
 
 interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "value"> {

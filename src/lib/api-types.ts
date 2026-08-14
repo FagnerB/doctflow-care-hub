@@ -186,6 +186,7 @@ export interface AppointmentCreateByDoctorPayload {
   patient_email?: string | null;
   scheduled_at: string; // ISO
   notes?: string | null;
+  notify_patient?: boolean;
 }
 
 export interface ResetPasswordPayload {

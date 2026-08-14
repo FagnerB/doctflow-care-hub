@@ -37,6 +37,10 @@ class AppointmentCreateByDoctor(BaseModel):
     patient_email: str | None = None
     scheduled_at: datetime
     notes: str | None = Field(default=None, max_length=2000)
+    # Padrão True (avisar é o caso comum). Precisa poder ser False para
+    # importar a agenda já existente do consultório sem disparar confirmação
+    # retroativa para pacientes que já sabem da própria consulta.
+    notify_patient: bool = True
 
     @field_validator("patient_phone")
     @classmethod

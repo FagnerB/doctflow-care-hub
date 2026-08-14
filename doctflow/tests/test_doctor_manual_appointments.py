@@ -128,6 +128,27 @@ async def test_agendamento_manual_registra_notificacao_de_confirmacao(client, se
     assert [log.type.value for log in logs] == ["confirmation"]
 
 
+async def test_agendamento_manual_com_notify_patient_falso_nao_notifica(client, session, doctor, doctor_token) -> None:
+    """Importação de agenda já existente não pode disparar confirmação
+    retroativa para dezenas de pacientes reais."""
+    quando = horario_futuro(hora=9)
+    response = await client.post(
+        "/api/doctors/me/appointments",
+        json={
+            "patient_name": "Paciente Importado",
+            "patient_phone": "11988887777",
+            "scheduled_at": quando.isoformat(),
+            "notify_patient": False,
+        },
+        headers=auth(doctor_token),
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["confirmation_sent_at"] is None
+
+    logs = (await session.scalars(select(NotificationLog))).all()
+    assert logs == []
+
+
 async def test_agendamento_manual_de_outro_medico_nao_vaza(client, session, doctor, doctor_token) -> None:
     """O appointment criado precisa ficar sob o doctor_id de quem está logado,
     nunca de outro médico — checagem direta de isolamento por tenant."""

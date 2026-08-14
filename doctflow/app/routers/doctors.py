@@ -104,8 +104,9 @@ async def create_my_appointment(
 
     O paciente é criado automaticamente se o telefone informado não existir
     ainda (mesma lógica do agendamento público). Dispara a mesma notificação
-    de confirmação do fluxo público, pra manter o comportamento consistente
-    entre os dois canais.
+    de confirmação do fluxo público por padrão — a menos que
+    `notify_patient=False` (importação de agenda já existente, onde disparar
+    confirmação retroativa para pacientes reais não faz sentido).
     """
     appointment = await appointment_service.create_doctor_appointment(session, current_doctor, payload)
     await session.commit()
@@ -116,15 +117,16 @@ async def create_my_appointment(
         .where(Appointment.id == appointment.id)
     )
 
-    try:
-        await appointment_service.send_confirmation_notifications(session, appointment)
-        await session.commit()
-    except Exception:
-        await session.rollback()
-        logger.exception("confirmation_notification_failed", extra={"appointment_id": appointment.id})
-        appointment = await session.scalar(
-            select(Appointment).options(selectinload(Appointment.patient)).where(Appointment.id == appointment.id)
-        )
+    if payload.notify_patient:
+        try:
+            await appointment_service.send_confirmation_notifications(session, appointment)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            logger.exception("confirmation_notification_failed", extra={"appointment_id": appointment.id})
+            appointment = await session.scalar(
+                select(Appointment).options(selectinload(Appointment.patient)).where(Appointment.id == appointment.id)
+            )
 
     return AppointmentRead.model_validate(appointment)
 

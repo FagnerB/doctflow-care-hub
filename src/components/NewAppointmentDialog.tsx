@@ -18,16 +18,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { PhoneInput, isValidPhone } from "@/components/PhoneInput";
 import { getErrorMessage } from "@/lib/api-client";
 import { buildBrasiliaIso, toBrasiliaDisplayDate } from "@/lib/timezone";
-import { weekdaysWithoutHours, workingHoursToWeeklyHours } from "@/lib/schedule-mapping";
+import { workingHoursToWeeklyHours } from "@/lib/schedule-mapping";
 import { cn } from "@/lib/utils";
-import { useCreateDoctorAppointment } from "@/hooks/use-appointments";
+import { useCreateDoctorAppointment, useDoctorAppointments } from "@/hooks/use-appointments";
 import { useAvailability } from "@/hooks/use-availability";
 import { filterPatients, usePatients, type PatientSummary } from "@/hooks/use-patients";
-import type { Doctor } from "@/lib/api-types";
+import type { Appointment, Doctor } from "@/lib/api-types";
 
 interface Props {
   open: boolean;
@@ -35,6 +36,8 @@ interface Props {
   doctor: Doctor;
   defaultDate?: Date;
 }
+
+const CANCELLED_STATUSES = ["cancelled_by_patient", "cancelled_by_doctor"];
 
 // Compara "HH:mm" convertendo para minutos — mais seguro que comparação de
 // string quando os formatos podem variar em zero à esquerda.
@@ -51,8 +54,32 @@ function isOutsideWorkingHours(doctor: Doctor, date: Date, timeStr: string): boo
   return !windows.some((w) => minutes >= toMinutes(w.start) && minutes < toMinutes(w.end));
 }
 
+// Índice único do banco só pega horário IDÊNTICO — duas consultas às 09:00 e
+// 09:15 com 30min de duração se sobrepõem sem colidir no índice. Isso aqui é
+// só aviso (o próprio índice já bloqueia o caso de colisão exata; encaixe
+// sobreposto é prática legítima e não pode ser proibido pelo sistema).
+function findOverlap(
+  appointments: Appointment[],
+  date: Date,
+  timeStr: string,
+  durationMinutes: number,
+): Appointment | null {
+  if (!timeStr) return null;
+  const start = new Date(buildBrasiliaIso(date, timeStr)).getTime();
+  const end = start + durationMinutes * 60_000;
+
+  for (const appointment of appointments) {
+    if (CANCELLED_STATUSES.includes(appointment.status)) continue;
+    const otherStart = new Date(appointment.scheduled_at).getTime();
+    const otherEnd = otherStart + appointment.duration_minutes * 60_000;
+    if (start < otherEnd && end > otherStart) return appointment;
+  }
+  return null;
+}
+
 export function NewAppointmentDialog({ open, onOpenChange, doctor, defaultDate }: Props) {
   const { patients } = usePatients();
+  const appointmentsQuery = useDoctorAppointments();
   const createAppointment = useCreateDoctorAppointment();
 
   const [search, setSearch] = useState("");
@@ -62,6 +89,7 @@ export function NewAppointmentDialog({ open, onOpenChange, doctor, defaultDate }
   const [date, setDate] = useState<Date | undefined>(defaultDate ?? new Date());
   const [timeStr, setTimeStr] = useState("");
   const [notes, setNotes] = useState("");
+  const [notifyPatient, setNotifyPatient] = useState(true);
   const [errors, setErrors] = useState<{ name?: string; phone?: string; time?: string }>({});
 
   const dateStr = date ? format(date, "yyyy-MM-dd") : "";
@@ -74,6 +102,13 @@ export function NewAppointmentDialog({ open, onOpenChange, doctor, defaultDate }
   );
 
   const outsideHours = date ? isOutsideWorkingHours(doctor, date, timeStr) : false;
+  const overlap = useMemo(
+    () =>
+      date
+        ? findOverlap(appointmentsQuery.data ?? [], date, timeStr, doctor.config_json.consultation_duration_minutes)
+        : null,
+    [appointmentsQuery.data, date, timeStr, doctor.config_json.consultation_duration_minutes],
+  );
 
   // Reseta o formulário toda vez que o modal abre — não deixa lixo da última
   // vez visível quando o médico abre de novo.
@@ -86,6 +121,7 @@ export function NewAppointmentDialog({ open, onOpenChange, doctor, defaultDate }
     setDate(defaultDate ?? new Date());
     setTimeStr("");
     setNotes("");
+    setNotifyPatient(true);
     setErrors({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -121,6 +157,7 @@ export function NewAppointmentDialog({ open, onOpenChange, doctor, defaultDate }
         patient_phone: phone,
         scheduled_at: buildBrasiliaIso(date, timeStr),
         notes: notes || undefined,
+        notify_patient: notifyPatient,
       },
       {
         onSuccess: () => {
@@ -266,12 +303,31 @@ export function NewAppointmentDialog({ open, onOpenChange, doctor, defaultDate }
                 Fora do expediente configurado — o agendamento é permitido mesmo assim.
               </div>
             )}
+            {overlap && (
+              <div className="flex items-center gap-1.5 rounded-md bg-warning/15 text-warning-foreground px-2.5 py-1.5 text-xs">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warning" />
+                Se sobrepõe com {overlap.patient?.name ?? "outra consulta"} às{" "}
+                {format(toBrasiliaDisplayDate(overlap.scheduled_at), "HH:mm")} ({overlap.duration_minutes}min) —
+                agendamento permitido mesmo assim.
+              </div>
+            )}
           </div>
 
           {/* Observação */}
           <div className="space-y-1.5">
             <Label htmlFor="notes">Observação (opcional)</Label>
             <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Ex.: encaixe pedido por telefone" />
+          </div>
+
+          {/* Notificar paciente */}
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+            <div>
+              <div className="text-sm font-medium text-foreground">Avisar o paciente pelo WhatsApp</div>
+              <div className="text-xs text-muted-foreground">
+                Desligue ao importar consultas que o paciente já sabe que tem — evita confirmação retroativa indevida.
+              </div>
+            </div>
+            <Switch checked={notifyPatient} onCheckedChange={setNotifyPatient} />
           </div>
         </div>
 

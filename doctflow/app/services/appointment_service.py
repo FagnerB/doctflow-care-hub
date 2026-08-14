@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.exceptions import ConflictError, ForbiddenError, NotFoundError
 from app.models.appointment import Appointment
-from app.models.common import AppointmentStatus, NotificationStatus, NotificationType, normalize_br_phone
+from app.models.common import AppointmentStatus, NotificationStatus, NotificationType, normalize_name
 from app.models.doctor import Doctor
 from app.models.notification_log import NotificationLog
 from app.models.patient import Patient
@@ -65,23 +65,31 @@ class AppointmentService:
             select(Doctor).options(selectinload(Doctor.user)).where(Doctor.id == doctor_id)
         )
 
-    async def get_patient_by_phone(self, session: AsyncSession, phone: str) -> Patient | None:
-        normalized = normalize_br_phone(phone)
-        return await session.scalar(select(Patient).where(Patient.phone == normalized))
+    async def get_or_create_patient(self, session: AsyncSession, doctor_id: str, payload: PatientCreate) -> Patient:
+        """Busca/cria paciente escopado ao médico -- nunca sobrescreve nome/email.
 
-    async def get_or_create_patient(self, session: AsyncSession, payload: PatientCreate) -> Patient:
-        existing = await self.get_patient_by_phone(session, payload.phone)
+        Identidade é (doctor_id, telefone, nome normalizado). Só reaproveita o
+        registro quando os três batem exatamente; qualquer diferença no nome
+        (ex.: mãe agendando pro segundo filho com o mesmo telefone) cria um
+        registro novo. Errar para o lado de duplicar é reversível -- fundir
+        duas pessoas diferentes no mesmo paciente não é, e com as observações
+        do paciente (P6) viraria vazamento de dado entre pessoas.
+        """
+        name_key = normalize_name(payload.name)
+        existing = await session.scalar(
+            select(Patient).where(
+                Patient.doctor_id == doctor_id,
+                Patient.phone == payload.phone,
+                Patient.name_key == name_key,
+            )
+        )
         if existing is not None:
-            existing.name = payload.name
-            # Só sobrescreve dados opcionais quando vieram preenchidos, para não
-            # apagar e-mail já cadastrado num agendamento anterior.
-            if payload.email:
-                existing.email = str(payload.email)
-            await session.flush()
             return existing
 
         patient = Patient(
+            doctor_id=doctor_id,
             name=payload.name,
+            name_key=name_key,
             phone=payload.phone,
             email=str(payload.email) if payload.email else None,
         )
@@ -113,6 +121,7 @@ class AppointmentService:
 
         patient = await self.get_or_create_patient(
             session,
+            doctor.id,
             PatientCreate(
                 name=payload.patient_name,
                 phone=payload.patient_phone,
@@ -156,6 +165,7 @@ class AppointmentService:
 
         patient = await self.get_or_create_patient(
             session,
+            doctor.id,
             PatientCreate(
                 name=payload.patient_name,
                 phone=payload.patient_phone,
@@ -288,29 +298,17 @@ class AppointmentService:
         return appointment
 
     async def cancel_by_phone(self, session: AsyncSession, phone: str) -> Appointment:
-        """Cancela a próxima consulta ativa do paciente identificado pelo telefone."""
-        patient = await self.get_patient_by_phone(session, phone)
-        if patient is None:
-            raise NotFoundError("Paciente não encontrado")
-
-        now = datetime.now(timezone.utc)
-        appointment = await session.scalar(
-            select(Appointment)
-            .where(
-                Appointment.patient_id == patient.id,
-                Appointment.status.in_(ACTIVE_STATUSES),
-                Appointment.scheduled_at >= now,
-            )
-            .order_by(Appointment.scheduled_at.asc())
+        """Desativado. Paciente agora é escopado por médico (doctor_id, phone,
+        nome) -- um telefone sozinho não identifica mais um paciente único
+        entre médicos diferentes (nem, no limite, dentro do mesmo médico, se
+        duas pessoas compartilharem o número). O webhook que chamava isso já
+        está desligado (app/main.py). Pra voltar a existir de verdade precisa
+        de uma forma de saber de qual médico é a conversa -- ex.: um número de
+        WhatsApp por médico -- não só o telefone de quem mandou a mensagem.
+        """
+        raise NotImplementedError(
+            "cancel_by_phone precisa de doctor_id -- redesenhar antes de religar o webhook"
         )
-        if appointment is None:
-            raise NotFoundError("Nenhuma consulta futura encontrada para cancelamento")
-
-        doctor = await self._load_doctor_with_user(session, appointment.doctor_id)
-        if doctor is None:
-            raise NotFoundError("Médico do agendamento não encontrado")
-
-        return await self._cancel_active_appointment(session, appointment, doctor)
 
     async def cancel_by_id(self, session: AsyncSession, appointment_id: str) -> Appointment:
         """Cancelamento público pelo link da tela de status.

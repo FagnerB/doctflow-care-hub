@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from datetime import date, datetime, time, timezone
 from enum import Enum
 from zoneinfo import ZoneInfo
@@ -89,6 +90,20 @@ def normalize_br_phone(phone: str) -> str:
 
 def phone_digits(phone: str) -> str:
     return "".join(character for character in phone if character.isdigit())
+
+
+def normalize_name(name: str) -> str:
+    """Chave de identidade do paciente: minúsculas, sem acento, espaços colapsados.
+
+    Usada em (doctor_id, phone, name_key) pra decidir se um novo agendamento
+    é a mesma pessoa de um cadastro existente ou uma pessoa diferente
+    compartilhando o telefone (ex.: mãe agendando pra dois filhos). Mantém
+    pontuação como veio -- só normaliza o que varia por acidente de digitação
+    (maiúscula, acento, espaço extra), não o que pode ser parte real do nome.
+    """
+    sem_acento = unicodedata.normalize("NFKD", name)
+    sem_acento = "".join(character for character in sem_acento if not unicodedata.combining(character))
+    return " ".join(sem_acento.lower().split())
 
 
 def weekday_key(date_value: date) -> str:

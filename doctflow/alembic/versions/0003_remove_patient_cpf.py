@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import inspect
 
 revision = "0003_remove_patient_cpf"
 down_revision = "0002_unique_active_slot"
@@ -21,9 +22,21 @@ branch_labels = None
 depends_on = None
 
 
+def _has_column(bind, table: str, column: str) -> bool:
+    return column in {col["name"] for col in inspect(bind).get_columns(table)}
+
+
 def upgrade() -> None:
-    op.drop_column("patients", "cpf")
+    # Idempotente: em banco novo, a migration 0001 já cria as tabelas a partir
+    # dos models ATUAIS (sem cpf) -- essa coluna nunca existe pra dropar. Em
+    # produção (rodou 0001 antes de cpf sair do model), ela existe de verdade
+    # e é removida normalmente.
+    bind = op.get_bind()
+    if _has_column(bind, "patients", "cpf"):
+        op.drop_column("patients", "cpf")
 
 
 def downgrade() -> None:
-    op.add_column("patients", sa.Column("cpf", sa.String(length=20), nullable=True))
+    bind = op.get_bind()
+    if not _has_column(bind, "patients", "cpf"):
+        op.add_column("patients", sa.Column("cpf", sa.String(length=20), nullable=True))

@@ -11,7 +11,6 @@ class PatientBase(BaseModel):
     name: str = Field(min_length=2, max_length=255)
     phone: str = Field(min_length=10, max_length=20)
     email: EmailStr | None = None
-    cpf: str | None = Field(default=None, max_length=20)
 
     @field_validator("phone")
     @classmethod
@@ -30,7 +29,6 @@ class PatientRead(BaseModel):
     name: str
     phone: str
     email: EmailStr | None
-    cpf: str | None
     created_at: datetime
 
 

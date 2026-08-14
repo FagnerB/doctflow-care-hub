@@ -13,7 +13,6 @@ class AppointmentCreatePublic(BaseModel):
     patient_name: str = Field(min_length=2, max_length=255)
     patient_phone: str = Field(min_length=10, max_length=20)
     patient_email: str | None = None
-    patient_cpf: str | None = Field(default=None, max_length=20)
     desired_datetime: datetime
     notes: str | None = Field(default=None, max_length=2000)
 

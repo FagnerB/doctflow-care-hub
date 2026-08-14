@@ -73,11 +73,9 @@ class AppointmentService:
         if existing is not None:
             existing.name = payload.name
             # Só sobrescreve dados opcionais quando vieram preenchidos, para não
-            # apagar e-mail/CPF já cadastrados num agendamento anterior.
+            # apagar e-mail já cadastrado num agendamento anterior.
             if payload.email:
                 existing.email = str(payload.email)
-            if payload.cpf:
-                existing.cpf = payload.cpf
             await session.flush()
             return existing
 
@@ -85,7 +83,6 @@ class AppointmentService:
             name=payload.name,
             phone=payload.phone,
             email=str(payload.email) if payload.email else None,
-            cpf=payload.cpf,
         )
         session.add(patient)
         await session.flush()
@@ -119,7 +116,6 @@ class AppointmentService:
                 name=payload.patient_name,
                 phone=payload.patient_phone,
                 email=payload.patient_email,
-                cpf=payload.patient_cpf,
             ),
         )
 
@@ -163,7 +159,6 @@ class AppointmentService:
                 name=payload.patient_name,
                 phone=payload.patient_phone,
                 email=payload.patient_email,
-                cpf=None,
             ),
         )
 

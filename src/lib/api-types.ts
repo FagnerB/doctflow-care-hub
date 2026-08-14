@@ -82,7 +82,6 @@ export interface Patient {
   name: string;
   phone: string;
   email: string | null;
-  cpf: string | null;
   created_at: string;
 }
 
@@ -175,7 +174,6 @@ export interface AppointmentCreatePayload {
   patient_name: string;
   patient_phone: string;
   patient_email?: string | null;
-  patient_cpf?: string | null;
   desired_datetime: string; // ISO
   notes?: string | null;
 }

@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarOff, CalendarPlus, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
+import { CalendarOff, CalendarPlus, CheckCircle2, Clock, Loader2, UserX, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { NewAppointmentDialog } from "@/components/NewAppointmentDialog";
@@ -276,6 +276,16 @@ function AgendaPage() {
                     onClick={() => updateAppointmentStatus(selected.id, "completed")}
                   >
                     Concluída
+                  </Button>
+                )}
+                {selected.status !== "no_show" && !CANCELLED.includes(selected.status) && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled={updateStatus.isPending}
+                    onClick={() => updateAppointmentStatus(selected.id, "no_show")}
+                  >
+                    <UserX className="h-4 w-4 mr-1.5" /> Não compareceu
                   </Button>
                 )}
                 {!CANCELLED.includes(selected.status) && (

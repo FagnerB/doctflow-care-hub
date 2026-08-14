@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.models.appointment import Appointment
+from app.models.common import normalize_name
 from app.models.notification_log import NotificationLog
 from app.models.patient import Patient
 
@@ -48,7 +49,15 @@ async def test_cria_agendamento_para_paciente_novo(client, doctor, doctor_token)
 
 
 async def test_reaproveita_paciente_existente_pelo_telefone(client, session, doctor, doctor_token) -> None:
-    session.add(Patient(id="patient-existente", name="Maria Antiga", phone="+5511977776666"))
+    session.add(
+        Patient(
+            id="patient-existente",
+            doctor_id=doctor.id,
+            name="Maria Antiga",
+            name_key=normalize_name("Maria Antiga"),
+            phone="+5511977776666",
+        )
+    )
     await session.commit()
 
     quando = horario_futuro(hora=10)

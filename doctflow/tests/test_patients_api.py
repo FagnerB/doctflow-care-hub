@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from app.models.appointment import Appointment
-from app.models.common import AppointmentStatus, UserRole
+from app.models.common import AppointmentStatus, UserRole, normalize_name
 from app.models.doctor import Doctor
 from app.models.patient import Patient
 from app.models.user import User
@@ -42,7 +42,13 @@ async def _outro_medico_com_paciente(session) -> tuple[Doctor, Patient]:
     )
     session.add(doctor_row)
 
-    patient = Patient(id="patient-do-outro", name="Paciente do Outro Médico", phone="+5511911112222")
+    patient = Patient(
+        id="patient-do-outro",
+        doctor_id=doctor_row.id,
+        name="Paciente do Outro Médico",
+        name_key=normalize_name("Paciente do Outro Médico"),
+        phone="+5511911112222",
+    )
     session.add(patient)
     await session.flush()
 
@@ -68,7 +74,13 @@ async def test_medico_nao_le_paciente_de_outro_medico(client, session, doctor, d
 
 
 async def test_medico_le_proprio_paciente(client, session, doctor, doctor_token) -> None:
-    patient = Patient(id="patient-do-doctor-1", name="Paciente Meu", phone="+5511900001111")
+    patient = Patient(
+        id="patient-do-doctor-1",
+        doctor_id=doctor.id,
+        name="Paciente Meu",
+        name_key=normalize_name("Paciente Meu"),
+        phone="+5511900001111",
+    )
     session.add(patient)
     await session.flush()
     session.add(

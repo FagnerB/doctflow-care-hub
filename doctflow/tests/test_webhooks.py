@@ -162,7 +162,7 @@ async def test_politica_de_cancelamento_bloqueia_em_cima_da_hora(client, doctor,
         Appointment(
             id="appt-curto-prazo",
             doctor_id=doctor.id,
-            patient_id=(await _criar_paciente(session)).id,
+            patient_id=(await _criar_paciente(session, doctor)).id,
             scheduled_at=quando,
             duration_minutes=30,
             status="confirmed",
@@ -180,10 +180,14 @@ async def test_politica_de_cancelamento_bloqueia_em_cima_da_hora(client, doctor,
     assert "24h" in response.json()["message"]
 
 
-async def _criar_paciente(session):
+async def _criar_paciente(session, doctor):
+    from app.models.common import normalize_name
     from app.models.patient import Patient
 
-    patient = Patient(id="patient-1", name="Carlos Souza", phone="+5511912345678")
+    patient = Patient(
+        id="patient-1", doctor_id=doctor.id, name="Carlos Souza", name_key=normalize_name("Carlos Souza"),
+        phone="+5511912345678",
+    )
     session.add(patient)
     await session.flush()
     return patient

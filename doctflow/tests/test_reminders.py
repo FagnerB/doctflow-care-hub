@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.models.appointment import Appointment
-from app.models.common import AppointmentStatus, NotificationType
+from app.models.common import AppointmentStatus, NotificationType, normalize_name
 from app.models.notification_log import NotificationLog
 from app.models.patient import Patient
 from app.services.appointment_service import appointment_service
@@ -23,9 +23,11 @@ async def _criar_consulta(
     appointment_id: str = "appt-1",
     phone: str = "+5511912345678",
 ) -> Appointment:
-    patient = await session.scalar(select(Patient).where(Patient.phone == phone))
+    patient = await session.scalar(
+        select(Patient).where(Patient.doctor_id == doctor.id, Patient.phone == phone)
+    )
     if patient is None:
-        patient = Patient(name="Carlos Souza", phone=phone)
+        patient = Patient(doctor_id=doctor.id, name="Carlos Souza", name_key=normalize_name("Carlos Souza"), phone=phone)
         session.add(patient)
         await session.flush()
 

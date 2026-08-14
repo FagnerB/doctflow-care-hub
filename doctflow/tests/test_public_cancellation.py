@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 from app.config import settings
 from app.models.appointment import Appointment
-from app.models.common import AppointmentStatus
+from app.models.common import AppointmentStatus, normalize_name
 from app.models.patient import Patient
 
 LOCAL_TZ = ZoneInfo(settings.timezone)
@@ -21,7 +21,9 @@ LOCAL_TZ = ZoneInfo(settings.timezone)
 async def _criar_consulta(
     session, doctor, *, horas_a_frente: float, status: AppointmentStatus = AppointmentStatus.confirmed
 ) -> Appointment:
-    patient = Patient(name="Paciente Teste", phone="+5511900001111")
+    patient = Patient(
+        doctor_id=doctor.id, name="Paciente Teste", name_key=normalize_name("Paciente Teste"), phone="+5511900001111"
+    )
     session.add(patient)
     await session.flush()
 

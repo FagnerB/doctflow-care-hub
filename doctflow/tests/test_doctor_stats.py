@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from app.models.appointment import Appointment
-from app.models.common import AppointmentStatus
+from app.models.common import AppointmentStatus, normalize_name
 from app.models.patient import Patient
 
 
@@ -14,7 +14,10 @@ def auth(token: str) -> dict[str, str]:
 
 
 async def _semear(session, doctor) -> None:
-    patient = Patient(id="patient-stats", name="Carlos Souza", phone="+5511912345678")
+    patient = Patient(
+        id="patient-stats", doctor_id=doctor.id, name="Carlos Souza", name_key=normalize_name("Carlos Souza"),
+        phone="+5511912345678",
+    )
     session.add(patient)
     await session.flush()
 

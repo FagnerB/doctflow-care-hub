@@ -63,3 +63,13 @@ export function usePublicAppointmentStatus(appointmentId: string | undefined) {
     retry: false,
   });
 }
+
+export function useCancelPublicAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (appointmentId: string) => appointmentsApi.cancelPublic(appointmentId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(appointmentKeys.publicStatus(data.id), data);
+    },
+  });
+}

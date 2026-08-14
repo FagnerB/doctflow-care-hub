@@ -69,4 +69,7 @@ export const appointmentsApi = {
 
   getPublicStatus: (appointmentId: string) =>
     apiGet<AppointmentPublicStatus>(`/api/appointments/${appointmentId}/status`, undefined, false),
+
+  cancelPublic: (appointmentId: string) =>
+    apiPost<AppointmentPublicStatus>(`/api/appointments/${appointmentId}/cancel`, undefined, false),
 };

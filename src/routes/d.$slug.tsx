@@ -18,7 +18,7 @@ import { TimeSlotGrid } from "@/components/TimeSlotGrid";
 import { PhoneInput, isValidPhone } from "@/components/PhoneInput";
 import { EmptyState } from "@/components/EmptyState";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CalendarPlus, CheckCircle2, Loader2, MessageCircle, Stethoscope, Sun, Moon, SearchX } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Loader2, Mail, Stethoscope, Sun, Moon, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/api-client";
@@ -358,7 +358,7 @@ function SuccessScreen({
   // Código curto só para referência visual — o id completo (UUID) é o que
   // realmente identifica a consulta nos links e na API.
   const shortCode = appointment.id.slice(0, 8).toUpperCase();
-  const patientPhone = appointment.patient?.phone;
+  const patientEmail = appointment.patient?.email;
 
   return (
     <div className="text-center py-4">
@@ -372,9 +372,15 @@ function SuccessScreen({
       </p>
       <p className="mt-1 text-xs text-muted-foreground">Código da consulta: #{shortCode}</p>
       <div className="mt-6 flex items-center gap-2 rounded-lg bg-secondary p-3 text-sm text-foreground">
-        <MessageCircle className="h-5 w-5 text-primary shrink-0" />
+        <Mail className="h-5 w-5 text-primary shrink-0" />
         <span className="text-left">
-          Você receberá lembretes pelo WhatsApp{patientPhone ? ` em ${patientPhone}` : ""}.
+          {patientEmail ? (
+            <>
+              Enviamos a confirmação para <strong>{patientEmail}</strong>.
+            </>
+          ) : (
+            "Você não informou email, então não vai receber confirmação por nenhum canal — guarde o código acima ou o link \"Ver minha consulta\" abaixo."
+          )}
         </span>
       </div>
       <div className="mt-4 flex flex-col gap-2">

@@ -1,14 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarCheck, Loader2, MessageCircle, SearchX, Stethoscope } from "lucide-react";
+import { CalendarCheck, CircleX, Loader2, SearchX, Stethoscope } from "lucide-react";
+import { getErrorMessage } from "@/lib/api-client";
 import { maskPhoneForPublic } from "@/lib/phone";
 import { toBrasiliaDisplayDate } from "@/lib/timezone";
-import { usePublicAppointmentStatus } from "@/hooks/use-appointments";
+import { useCancelPublicAppointment, usePublicAppointmentStatus } from "@/hooks/use-appointments";
 import type { AppointmentStatus } from "@/lib/api-types";
+import { toast } from "sonner";
 
 const ACTIVE_STATUSES: AppointmentStatus[] = ["pending", "confirmed"];
 
@@ -42,6 +55,14 @@ const statusColor: Record<AppointmentStatus, string> = {
 function AppointmentStatusPage() {
   const { id } = Route.useParams();
   const statusQuery = usePublicAppointmentStatus(id);
+  const cancelMutation = useCancelPublicAppointment();
+
+  const handleCancel = () => {
+    if (!id) return;
+    cancelMutation.mutate(id, {
+      onError: (error) => toast.error(getErrorMessage(error)),
+    });
+  };
 
   return (
     <div className="min-h-screen bg-secondary flex flex-col">
@@ -103,20 +124,40 @@ function AppointmentStatusPage() {
                 </div>
               </div>
 
-              {/* Sem endpoint público de cancelamento por id no backend — o único
-                  caminho real é responder CANCELAR no WhatsApp. Só faz sentido
-                  mostrar esse aviso enquanto a consulta ainda está ativa. */}
               {ACTIVE_STATUSES.includes(statusQuery.data.status) && (
-                <div className="mt-6 flex items-start gap-2 rounded-lg bg-secondary p-3 text-sm text-foreground">
-                  <MessageCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <span className="text-left">
-                    Para cancelar, responda <strong>CANCELAR</strong> na conversa do WhatsApp que você recebeu.
-                  </span>
-                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="mt-6 w-full text-destructive hover:text-destructive"
+                      disabled={cancelMutation.isPending}
+                    >
+                      {cancelMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      ) : (
+                        <CircleX className="h-4 w-4 mr-1.5" />
+                      )}
+                      Cancelar consulta
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancelar esta consulta?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        O horário fica livre para outro paciente. Essa ação não pode ser desfeita — pra remarcar,
+                        você vai precisar agendar de novo.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Voltar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleCancel}>Cancelar consulta</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
 
-              <Link to="/" className="mt-6 block">
-                <Button variant="outline" className="w-full">Voltar ao início</Button>
+              <Link to="/" className="mt-3 block">
+                <Button variant="ghost" className="w-full">Voltar ao início</Button>
               </Link>
             </>
           )}

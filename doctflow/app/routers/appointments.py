@@ -59,17 +59,7 @@ async def create_appointment(
     return AppointmentRead.model_validate(appointment)
 
 
-@router.get(
-    "/{appointment_id}/status",
-    response_model=AppointmentPublicStatusResponse,
-    dependencies=[Depends(rate_limit_public_generous)],
-)
-async def get_public_status(
-    appointment_id: str,
-    session: AsyncSession = Depends(get_db_session),
-) -> AppointmentPublicStatusResponse:
-    """Status da consulta pelo link enviado ao paciente (id UUID funciona como token)."""
-    appointment = await appointment_service.get_public_status(session, appointment_id)
+def _to_public_status_response(appointment: Appointment) -> AppointmentPublicStatusResponse:
     return AppointmentPublicStatusResponse(
         id=appointment.id,
         status=appointment.status,
@@ -81,6 +71,47 @@ async def get_public_status(
         patient_name=appointment.patient.name,
         patient_phone=appointment.patient.phone,
     )
+
+
+@router.get(
+    "/{appointment_id}/status",
+    response_model=AppointmentPublicStatusResponse,
+    dependencies=[Depends(rate_limit_public_generous)],
+)
+async def get_public_status(
+    appointment_id: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> AppointmentPublicStatusResponse:
+    """Status da consulta pelo link enviado ao paciente (id UUID funciona como token)."""
+    appointment = await appointment_service.get_public_status(session, appointment_id)
+    return _to_public_status_response(appointment)
+
+
+@router.post(
+    "/{appointment_id}/cancel",
+    response_model=AppointmentPublicStatusResponse,
+    dependencies=[Depends(rate_limit_public)],
+)
+async def cancel_public_appointment(
+    appointment_id: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> AppointmentPublicStatusResponse:
+    """Cancelamento pelo próprio paciente via link (id UUID funciona como token,
+    mesmo padrão do status público). Rate limit mais restrito que o status
+    porque é uma escrita, não só leitura."""
+    appointment = await appointment_service.cancel_by_id(session, appointment_id)
+    await session.commit()
+    appointment = await _load_appointment(session, appointment.id)
+
+    # Mesma regra do agendamento: falha ao avisar não pode derrubar o cancelamento.
+    try:
+        await appointment_service.send_cancellation_notifications(session, appointment)
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        logger.exception("cancellation_notification_failed", extra={"appointment_id": appointment.id})
+
+    return _to_public_status_response(appointment)
 
 
 # O webhook de WhatsApp saiu deste router para app/routers/webhooks.py, onde

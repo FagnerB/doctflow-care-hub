@@ -303,13 +303,25 @@ export function NewAppointmentDialog({ open, onOpenChange, doctor, defaultDate }
                 Fora do expediente configurado — o agendamento é permitido mesmo assim.
               </div>
             )}
-            {overlap && (
-              <div className="flex items-center gap-1.5 rounded-md bg-warning/15 text-warning-foreground px-2.5 py-1.5 text-xs">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warning" />
-                Se sobrepõe com {overlap.patient?.name ?? "outra consulta"} às{" "}
-                {format(toBrasiliaDisplayDate(overlap.scheduled_at), "HH:mm")} ({overlap.duration_minutes}min) —
-                agendamento permitido mesmo assim.
+            {timeStr && appointmentsQuery.isError ? (
+              <div className="flex items-center gap-1.5 rounded-md bg-destructive/15 text-destructive px-2.5 py-1.5 text-xs">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                Não foi possível verificar conflito de horário agora — confira a agenda antes de confirmar.
               </div>
+            ) : timeStr && appointmentsQuery.isLoading ? (
+              <div className="flex items-center gap-1.5 text-muted-foreground px-0.5 py-1 text-xs">
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                Verificando conflito de horário...
+              </div>
+            ) : (
+              overlap && (
+                <div className="flex items-center gap-1.5 rounded-md bg-warning/15 text-warning-foreground px-2.5 py-1.5 text-xs">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warning" />
+                  Se sobrepõe com {overlap.patient?.name ?? "outra consulta"} às{" "}
+                  {format(toBrasiliaDisplayDate(overlap.scheduled_at), "HH:mm")} ({overlap.duration_minutes}min) —
+                  agendamento permitido mesmo assim.
+                </div>
+              )
             )}
           </div>
 

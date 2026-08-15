@@ -12,4 +12,14 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Hard-pin the Vercel target instead of relying on the "cloudflare-module"
+  // default + Nitro's own auto-detection. This is an SSR app (TanStack
+  // Start), not a static SPA: routes like /d/{slug} are resolved by a
+  // server function, not by a static index.html fallback, so the build
+  // must emit Vercel's serverless function output (.vercel/output), not a
+  // Cloudflare Worker bundle. No effect inside the Lovable sandbox, which
+  // always forces cloudflare-module regardless of this setting.
+  nitro: {
+    preset: "vercel",
+  },
 });

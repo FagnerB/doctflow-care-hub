@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, MailCheck, Stethoscope } from "lucide-react";
+import { Loader2, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useForgotPassword } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api-client";
@@ -41,9 +41,7 @@ function ForgotPasswordPage() {
     <div className="min-h-screen bg-secondary flex flex-col">
       <header className="px-4 py-4">
         <Link to="/" className="inline-flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary grid place-items-center">
-            <Stethoscope className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src="/logo-mark.svg" alt="DoctFlow" className="h-8 w-8 rounded-lg" />
           <span className="font-bold text-lg text-foreground">DoctFlow</span>
         </Link>
       </header>

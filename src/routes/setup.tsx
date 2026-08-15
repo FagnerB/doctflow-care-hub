@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Check, Copy, Loader2, ShieldAlert, Stethoscope } from "lucide-react";
+import { Check, Copy, Loader2, ShieldAlert } from "lucide-react";
 import { WeeklySchedule, type WeeklyHours, defaultWeeklyHours } from "@/components/WeeklySchedule";
 import { useLogin, useResetPassword } from "@/hooks/use-auth";
 import { useDoctorProfile, useUpdateDoctorProfile } from "@/hooks/use-doctor";
@@ -123,9 +123,7 @@ function SetupPage() {
     <div className="min-h-screen bg-secondary">
       <header className="px-4 py-4 border-b border-border bg-background">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary grid place-items-center">
-            <Stethoscope className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src="/logo-mark.svg" alt="DoctFlow" className="h-8 w-8 rounded-lg" />
           <span className="font-bold text-lg text-foreground">DoctFlow</span>
         </div>
       </header>

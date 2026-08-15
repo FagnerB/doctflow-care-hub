@@ -8,7 +8,6 @@ import {
   MessageCircle,
   Check,
   Sparkles,
-  Stethoscope,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -37,9 +36,7 @@ function Landing() {
       <header className="border-b border-border bg-background/80 backdrop-blur sticky top-0 z-30">
         <div className="mx-auto max-w-6xl px-4 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary grid place-items-center">
-              <Stethoscope className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src="/logo-mark.svg" alt="DoctFlow" className="h-8 w-8 rounded-lg" />
             <span className="font-bold text-lg text-foreground">DoctFlow</span>
           </Link>
           <nav className="flex items-center gap-2">
@@ -175,9 +172,7 @@ function Landing() {
       <footer className="border-t border-border py-8">
         <div className="mx-auto max-w-6xl px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-primary grid place-items-center">
-              <Stethoscope className="h-4 w-4 text-primary-foreground" />
-            </div>
+            <img src="/logo-mark.svg" alt="DoctFlow" className="h-6 w-6 rounded-md" />
             <span>© {new Date().getFullYear()} DoctFlow</span>
           </div>
           <div className="flex gap-6">

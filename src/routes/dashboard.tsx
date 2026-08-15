@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Calendar, CalendarOff, Users, Settings, LogOut, Stethoscope } from "lucide-react";
+import { Calendar, CalendarOff, Users, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/hooks/use-auth";
 import { hasAccessToken } from "@/lib/auth-storage";
@@ -50,9 +50,7 @@ function DashboardLayout() {
       {/* Sidebar desktop */}
       <aside className="hidden md:flex md:w-64 flex-col bg-background border-r border-border">
         <div className="h-16 flex items-center gap-2 px-6 border-b border-border">
-          <div className="h-8 w-8 rounded-lg bg-primary grid place-items-center">
-            <Stethoscope className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src="/logo-mark.svg" alt="DoctFlow" className="h-8 w-8 rounded-lg" />
           <span className="font-bold text-lg text-foreground">DoctFlow</span>
         </div>
         <nav className="flex-1 p-3 space-y-1">
@@ -95,9 +93,7 @@ function DashboardLayout() {
       {/* Header mobile */}
       <header className="md:hidden h-14 bg-background border-b border-border flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-md bg-primary grid place-items-center">
-            <Stethoscope className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img src="/logo-mark.svg" alt="DoctFlow" className="h-7 w-7 rounded-md" />
           <span className="font-bold text-foreground">DoctFlow</span>
         </div>
         <button onClick={logout} aria-label="Sair" className="p-2 -mr-2 text-muted-foreground">

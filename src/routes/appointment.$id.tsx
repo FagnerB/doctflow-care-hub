@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarCheck, CircleX, Loader2, SearchX, Stethoscope } from "lucide-react";
+import { CalendarCheck, CircleX, Loader2, SearchX } from "lucide-react";
 import { getErrorMessage } from "@/lib/api-client";
 import { maskPhoneForPublic } from "@/lib/phone";
 import { toBrasiliaDisplayDate } from "@/lib/timezone";
@@ -68,9 +68,7 @@ function AppointmentStatusPage() {
     <div className="min-h-screen bg-secondary flex flex-col">
       <header className="px-4 py-4">
         <Link to="/" className="inline-flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary grid place-items-center">
-            <Stethoscope className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src="/logo-mark.svg" alt="DoctFlow" className="h-8 w-8 rounded-lg" />
           <span className="font-bold text-lg text-foreground">DoctFlow</span>
         </Link>
       </header>

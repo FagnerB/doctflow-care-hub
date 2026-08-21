@@ -189,7 +189,11 @@ contratos HTTP sem precisar de Postgres.
 - Aponte `DATABASE_URL` para o Supabase Postgres.
 - Configure `JWT_SECRET_KEY`, `SUPABASE_*` e `CORS_ORIGINS` no ambiente de produção.
 - Execute as migrações antes de subir a aplicação.
-- Rode com `uvicorn app.main:app --host 0.0.0.0 --port 8000` ou em um container com `gunicorn`/`uvicorn` workers.
+- Start command (a porta vem da plataforma via `$PORT` -- Render e Railway
+  injetam essa variável, nunca fixe a porta): `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+- `GET /health` não toca no banco -- use para keep-alive/cron externo.
+  `GET /ready` executa `SELECT 1` -- use só para readiness check, não para
+  manter o serviço acordado (gasta conexão de banco a cada chamada).
 
 ## Observações
 

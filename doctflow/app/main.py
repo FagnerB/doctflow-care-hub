@@ -55,6 +55,12 @@ def configure_logging() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    # Diagnostico temporario: confirma no log do Render o que o CORSMiddleware
+    # recebeu de verdade, sem depender de "parece certo no painel". JsonLogFormatter
+    # so inclui um whitelist fixo de chaves de `extra`, entao vai direto na mensagem.
+    logging.getLogger(__name__).info(
+        "cors_origins_parsed raw=%r parsed=%r", settings.cors_origins, settings.cors_origin_list
+    )
 
     # Scheduler interno de lembretes. Desligue (REMINDERS_SCHEDULER_ENABLED=false)
     # se for acionar por cron externo ou rodar mais de uma réplica da API.

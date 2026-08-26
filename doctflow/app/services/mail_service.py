@@ -51,15 +51,11 @@ class MailService:
         reply_to: str | None = None,
     ) -> MailResult:
         if self.provider != "smtp" or not self._smtp_configured():
-            logger.info(
-                "mail_notification_mock",
-                extra={
-                    "to": to_email,
-                    "subject": subject,
-                    "provider": "console",
-                    "reason": "SMTP_* incompleto" if self.provider == "smtp" else f"provider={self.provider}",
-                },
-            )
+            reason = "SMTP_* incompleto" if self.provider == "smtp" else f"provider={self.provider}"
+            # JsonLogFormatter só repassa um whitelist fixo de chaves do `extra`
+            # (path/method/status_code/request_id/user_id/provider/phone) -- to/subject/
+            # reason ficariam mudos no log se fossem por `extra`. Vai na mensagem.
+            logger.info("mail_notification_mock to=%s subject=%r reason=%s", to_email, subject, reason)
             return MailResult(ok=True, provider="console", simulated=True)
 
         message = EmailMessage()
@@ -91,7 +87,8 @@ class MailService:
                 timeout=20,
             )
         except (aiosmtplib.SMTPException, OSError, TimeoutError) as exc:
-            logger.warning("mail_send_failed", extra={"to": to_email, "subject": subject})
+            # Mesmo motivo do log acima: erro real precisa ir na mensagem, não em `extra`.
+            logger.warning("mail_send_failed to=%s subject=%r error=%s", to_email, subject, exc)
             return MailResult(ok=False, provider="smtp", error_message=str(exc))
 
         return MailResult(ok=True, provider="smtp")

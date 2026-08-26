@@ -376,10 +376,11 @@ function SuccessScreen({
         <span className="text-left">
           {patientEmail ? (
             <>
-              Enviamos a confirmação para <strong>{patientEmail}</strong>.
+              Se o email chegar, a confirmação vai para <strong>{patientEmail}</strong>. De qualquer forma, guarde
+              o link abaixo.
             </>
           ) : (
-            "Você não informou email, então não vai receber confirmação por nenhum canal — guarde o código acima ou o link \"Ver minha consulta\" abaixo."
+            "Você não informou email, então não vai receber confirmação por nenhum canal — guarde o código acima ou o link abaixo."
           )}
         </span>
       </div>
@@ -397,9 +398,12 @@ function SuccessScreen({
         </a>
         <Link to="/appointment/$id" params={{ id: appointment.id }} className="w-full">
           <Button variant="outline" className="w-full">
-            Ver minha consulta
+            Ver ou cancelar minha consulta
           </Button>
         </Link>
+        <p className="text-xs text-muted-foreground">
+          Salve este link — é por ele que você acompanha ou cancela a consulta, com ou sem email.
+        </p>
         <Button className="w-full" onClick={onClose}>Fechar</Button>
       </div>
     </div>
